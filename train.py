@@ -14,7 +14,7 @@ from tasks.decoders import DummyDecoder
 from tasks.task import task_registry
 
 from utils.config_utils import instantiate
-
+from utils import registry
 from omegaconf import DictConfig, OmegaConf
 
 
@@ -36,8 +36,9 @@ class LightningSequenceModel(pl.LightningModule):
         self.encoder = DummyEncoder()
         self.decoder = DummyDecoder()
 
-        if self.hparams.model._name_ == "conv_net":
-            self.model = ConvNet(self.hparams.model.in_channels, self.hparams.model.img_size)
+        #if self.hparams.model._name_ == "conv_net":
+        #    self.model = ConvNet(self.hparams.model.in_channels, self.hparams.model.img_size)
+        self.model = instantiate(registry.model, self.hparams.model)
 
         self.task = instantiate(task_registry, self.hparams.task, dataset=self.dataset, model=self.model)
         self.criterion = self.task.loss
@@ -140,10 +141,23 @@ class LightningSequenceModel(pl.LightningModule):
         args = self.hparams.optimizer.copy()
         with omegaconf.open_dict(args):
             del args['_name_']
-        optimizer = hydra.utils.instantiate(args, params)
+        optimizer = instantiate(registry.optimizer, self.hparams.optimizer, params)
         # optimizer = hydra.utils.instantiate(self.hparams.optimizer)
         print(f"Optimizer: {optimizer}")
-        return optimizer
+
+        # Configure scheduler
+        if "scheduler" not in self.hparams:
+            return optimizer
+        lr_scheduler = instantiate(
+            registry.scheduler, self.hparams.scheduler, optimizer
+        )
+        scheduler = {
+            "scheduler": lr_scheduler,
+            "interval": self.hparams.train.interval,  # 'epoch' or 'step'
+            "monitor": self.hparams.train.monitor,
+            "name": "trainer/lr",  # default is e.g. 'lr-AdamW'
+        }
+        return [optimizer], [scheduler]
 
     def train_dataloader(self):
         return self.dataset.train_dataloader(**self.hparams.loader)
