@@ -6,6 +6,7 @@ dataloaders/data/*
 
 ## logs
 lightning_logs/*
+outputs/*
 
 
 ### macOS ###
