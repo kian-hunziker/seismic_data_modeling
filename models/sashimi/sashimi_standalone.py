@@ -8,7 +8,7 @@ It's Raw! Audio Generation with State-Space Models
 Karan Goel, Albert Gu, Chris Donahue, Christopher Re.
 """
 import sys
-sys.path.append('../s4/')
+sys.path.append('../../s4/')
 
 import torch
 import torch.nn as nn
@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 from einops import rearrange
 
-from sashimi.s4_standalone import LinearActivation, S4Block as S4
+from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
 
 class DownPool(nn.Module):
     def __init__(self, d_input, expand, pool):
@@ -434,7 +434,7 @@ class Sashimi(nn.Module):
 if __name__ == '__main__':
     from tqdm.auto import tqdm
 
-    model = Sashimi(n_layers=2).cuda()
+    model = Sashimi(n_layers=2)#.cuda()
     # Print parameter count
     print(sum(p.numel() for p in model.parameters()))
 
@@ -442,7 +442,7 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         # Forward in convolutional mode: used for training SaShiMi
-        x = torch.randn(3, 10240, 64).cuda()
+        x = torch.randn(3, 10240, 64)#.cuda()
         y, _ = model(x)
 
         # Setup the SaShiMi RNN
@@ -450,12 +450,12 @@ if __name__ == '__main__':
 
         # Forward in recurrent mode: used for autoregressive generation at inference time
         ys = []
-        state = model.default_state(*x.shape[:1], device='cuda')
+        state = model.default_state(*x.shape[:1], device='cpu')
         for i in tqdm(range(10240)):
             y_, state = model.step(x[:, i], state)
             ys.append(y_.detach().cpu())
 
         ys = torch.stack(ys, dim=1)
-        breakpoint()
+        #breakpoint()
 
         print(y.shape, ys.shape)
