@@ -1,6 +1,8 @@
+import datetime
 import hydra
 import omegaconf
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import TensorBoardLogger
 import torch
 import numpy as np
 import pandas as pd
@@ -27,6 +29,7 @@ class LightningSequenceModel(pl.LightningModule):
         else:
             print(f"Unknown dataset name: {self.hparams.dataset._name_}")
             self.dataset = None
+
         self.setup()
 
     def setup(self, stage=None):
@@ -153,7 +156,19 @@ class LightningSequenceModel(pl.LightningModule):
 
 
 def create_trainer(config):
-    trainer = pl.Trainer(**config.trainer)
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    model_name = config.model['_name_']
+
+    # setup logger
+    logger = TensorBoardLogger(
+        save_dir='lightning_logs',
+        name=model_name,
+        default_hp_metric=False,
+        version=current_date,
+    )
+
+    # initialize trainer
+    trainer = pl.Trainer(logger=logger, **config.trainer)
     return trainer
 
 
