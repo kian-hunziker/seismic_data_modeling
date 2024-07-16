@@ -1,0 +1,3 @@
+_name_: mnist
+val_split: 0.1
+seed: 42

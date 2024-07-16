@@ -1,0 +1,2 @@
+_name_: classification
+loss: cross-entropy

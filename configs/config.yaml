@@ -1,0 +1,7 @@
+defaults:
+  - dataset: mnist
+  - model: dummy
+  - optimizer: adam
+  - trainer: default
+  - task: classification
+  - loader: default
