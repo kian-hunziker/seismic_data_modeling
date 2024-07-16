@@ -4,6 +4,9 @@
 ## Data
 dataloaders/data/*
 
+## logs
+lightning_logs/*
+
 
 ### macOS ###
 # General
