@@ -1,2 +1,3 @@
 _name_: regression
-_target_: torch.nn.functional.mse_loss
+loss: mse
+metrics: mse
