@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataloaders.MNISTdataloader import MNISTdataset
+from dataloaders.simple_waveform import SineWaveLightningDataset
 from models.simple_test_models import ConvNet
-from tasks.encoders import DummyEncoder
-from tasks.decoders import DummyDecoder
+from tasks.encoders import DummyEncoder, LinearEncoder
+from tasks.decoders import DummyDecoder, LinearDecoder
 from tasks.task import task_registry
 
 from utils.config_utils import instantiate
@@ -26,6 +27,11 @@ class LightningSequenceModel(pl.LightningModule):
         # initialize dataset:
         if self.hparams.dataset._name_ == "mnist":
             self.dataset = MNISTdataset(data_dir='dataloaders/data', **self.hparams.dataset)
+        elif self.hparams.dataset._name_ == "sine":
+            self.dataset = SineWaveLightningDataset(
+                data_dir='dataloaders/data/basic_waveforms/sine_waveform_2.npy',
+                **self.hparams.dataset,
+            )
         else:
             print(f"Unknown dataset name: {self.hparams.dataset._name_}")
             self.dataset = None
@@ -33,8 +39,8 @@ class LightningSequenceModel(pl.LightningModule):
         self.setup()
 
     def setup(self, stage=None):
-        self.encoder = DummyEncoder()
-        self.decoder = DummyDecoder()
+        self.encoder = LinearEncoder(1, self.hparams.model.d_model)
+        self.decoder = LinearDecoder(self.hparams.model.d_model, 1)
 
         #if self.hparams.model._name_ == "conv_net":
         #    self.model = ConvNet(self.hparams.model.in_channels, self.hparams.model.img_size)
@@ -142,7 +148,6 @@ class LightningSequenceModel(pl.LightningModule):
         with omegaconf.open_dict(args):
             del args['_name_']
         optimizer = instantiate(registry.optimizer, self.hparams.optimizer, params)
-        # optimizer = hydra.utils.instantiate(self.hparams.optimizer)
         print(f"Optimizer: {optimizer}")
 
         # Configure scheduler
