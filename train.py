@@ -2,7 +2,7 @@ import datetime
 import hydra
 import omegaconf
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 import torch
 import numpy as np
 import pandas as pd
@@ -29,7 +29,7 @@ class LightningSequenceModel(pl.LightningModule):
             self.dataset = MNISTdataset(data_dir='dataloaders/data', **self.hparams.dataset)
         elif self.hparams.dataset._name_ == "sine":
             self.dataset = SineWaveLightningDataset(
-                data_dir='dataloaders/data/basic_waveforms/sine_waveform_3.npy',
+                data_dir='dataloaders/data/basic_waveforms/sine_waveform.npy',
                 **self.hparams.dataset,
             )
         else:
@@ -175,19 +175,30 @@ class LightningSequenceModel(pl.LightningModule):
 
 
 def create_trainer(config):
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d__%H_%M_%S")
     model_name = config.model['_name_']
 
     # setup logger
-    logger = TensorBoardLogger(
-        save_dir='lightning_logs',
-        name=model_name,
+
+    logger_t = TensorBoardLogger(
+        save_dir='wandb_logs',
+        name='MA',
         default_hp_metric=False,
         version=current_date,
     )
 
+    logger_wab = WandbLogger(
+        project='MA',
+        save_dir='wandb_logs',
+        name=model_name,
+        version=current_date,
+    )
+
+    loggers = [logger_t, logger_wab]
+
+
     # initialize trainer
-    trainer = pl.Trainer(logger=logger, **config.trainer)
+    trainer = pl.Trainer(logger=loggers, **config.trainer)
     return trainer
 
 
