@@ -8,7 +8,7 @@ dataloaders/data/*
 lightning_logs/*
 outputs/*
 wandb_logs/*
-
+*.sh
 
 ### macOS ###
 # General
