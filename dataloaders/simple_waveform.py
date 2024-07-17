@@ -28,20 +28,21 @@ class SineWaveformDataset(Dataset):
 
     def _generate_dataset(self):
         num_waveforms = 500
+        num_examples_per_freq = 20
         len_waveform = 32_000
         f_sampling = 16_000
-        n_frequencies = 200
-        min_freq = 80
+        n_frequencies = 400
+        min_freq = 10
         max_freq = 4_000
 
         frequencies = np.linspace(min_freq, max_freq, n_frequencies)
         t = np.linspace(0, len_waveform / f_sampling, len_waveform)
 
-        data = np.zeros((len(frequencies)*5, len_waveform))
+        data = np.zeros((len(frequencies) * num_examples_per_freq, len_waveform))
 
         for i in range(data.shape[0]):
-            f=frequencies[i//5]
-            data[i, :] = np.sin(2 * np.pi * f * t)*np.random.random()
+            f=frequencies[i//num_examples_per_freq]
+            data[i, :] = np.sin(2 * np.pi * f * t) * np.random.random()
 
         #data = np.zeros((num_waveforms, len_waveform))
         #for i in range(num_waveforms):

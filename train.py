@@ -29,7 +29,7 @@ class LightningSequenceModel(pl.LightningModule):
             self.dataset = MNISTdataset(data_dir='dataloaders/data', **self.hparams.dataset)
         elif self.hparams.dataset._name_ == "sine":
             self.dataset = SineWaveLightningDataset(
-                data_dir='dataloaders/data/basic_waveforms/sine_waveform_2.npy',
+                data_dir='dataloaders/data/basic_waveforms/sine_waveform_3.npy',
                 **self.hparams.dataset,
             )
         else:

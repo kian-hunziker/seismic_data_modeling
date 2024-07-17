@@ -1,5 +1,5 @@
 _name_: sashimi
-d_model: 16
+d_model: 64
 n_layers: 8
 pool:
   - 4
