@@ -1,16 +1,3 @@
-#defaults:
-#  - dataset: mnist
-#  - model: dummy
-#  - optimizer: adam
-#  - scheduler: plateau
-#  - trainer: default
-#  - task: classification
-#  - loader: default
-
-#train:
-#  monitor: val/loss
-#  mode: min
-
 defaults:
   - /trainer: default
   - /loader: default
