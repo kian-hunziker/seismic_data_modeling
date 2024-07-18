@@ -14,7 +14,7 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: sine
+  - /dataset: cr_small
   - /task: regression
   - /optimizer: adamw
   - /scheduler: plateau
