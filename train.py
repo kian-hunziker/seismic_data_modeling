@@ -25,6 +25,8 @@ class LightningSequenceModel(pl.LightningModule):
         self.save_hyperparameters(config)
 
         # initialize dataset:
+        self.dataset = instantiate(registry.dataset, self.hparams.dataset)
+        '''
         if self.hparams.dataset._name_ == "mnist":
             self.dataset = MNISTdataset(data_dir='dataloaders/data', **self.hparams.dataset)
         elif self.hparams.dataset._name_ == "sine":
@@ -35,7 +37,7 @@ class LightningSequenceModel(pl.LightningModule):
         else:
             print(f"Unknown dataset name: {self.hparams.dataset._name_}")
             self.dataset = None
-
+        '''
         self.setup()
 
     def setup(self, stage=None):
