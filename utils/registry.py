@@ -21,3 +21,9 @@ model = {
     "sashimi": "models.sashimi.sashimi_standalone.Sashimi",
     "conv_net": "models.simple_test_models.ConvNet"
 }
+
+dataset = {
+    "mnist": "dataloaders.MNISTdataloader.MNISTdataset",
+    "sine": "dataloaders.simple_waveform.SineWaveLightningDataset",
+    "costarica-small": "dataloaders.costa_rica_small.CostaRicaSmallLighting"
+}
