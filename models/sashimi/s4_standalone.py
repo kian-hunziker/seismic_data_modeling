@@ -13,6 +13,8 @@ import torch.nn.functional as F
 from pytorch_lightning.utilities import rank_zero_only
 from einops import rearrange, repeat
 
+from s4.src.models.functional.krylov import krylov
+
 # Function aliases
 contract = torch.einsum
 
@@ -43,8 +45,8 @@ log = get_logger(__name__)
 
 # Try CUDA extension
 try:
-    from extensions.kernels.cauchy import cauchy_mult as cauchy_cuda
-    from extensions.kernels.vandermonde import log_vandermonde_cuda
+    from s4.extensions.kernels.cauchy import cauchy_mult as cauchy_cuda
+    from s4.extensions.kernels.vandermonde import log_vandermonde_cuda
     has_cuda_extension = True
     log.info("CUDA extension for structured kernels (Cauchy and Vandermonde multiplication) found.")
 except:
