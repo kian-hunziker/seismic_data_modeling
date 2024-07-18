@@ -13,7 +13,6 @@ import torch.nn.functional as F
 from pytorch_lightning.utilities import rank_zero_only
 from einops import rearrange, repeat
 
-from s4.src.models.functional.krylov import krylov
 
 # Function aliases
 contract = torch.einsum
