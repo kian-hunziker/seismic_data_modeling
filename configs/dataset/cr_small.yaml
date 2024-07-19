@@ -1,4 +1,4 @@
 _name_: costarica-small
 data_dir: dataloaders/data/costa_rica/small_subset
-sample_len: 2048
+sample_len: 100000
 val_split: 0.1
