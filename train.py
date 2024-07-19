@@ -43,7 +43,7 @@ class LightningSequenceModel(pl.LightningModule):
     def setup(self, stage=None):
         self.encoder = LayerNormClassEncoder(
             in_features=1,
-            out_features=self.hparams.d_model,
+            out_features=self.hparams.model.d_model,
             num_classes=256
         )
         self.decoder = LinearDecoder(self.hparams.model.d_model, 1)
