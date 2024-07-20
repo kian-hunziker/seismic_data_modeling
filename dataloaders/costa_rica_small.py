@@ -15,10 +15,17 @@ class CostaRicaSmall(Dataset):
     consist of (x, y), both with dimensions [sample_len, 1]. The sequences are shifted by one element.
     The resulting batches have dimensions [batch_size, sample_len, 1].
     """
-    def __init__(self, file: str = None, sample_len: int = 2048, train: bool = True):
+
+    def __init__(self, file: str = None,
+                 sample_len: int = 2048,
+                 normalize_const: float = 20000.0,
+                 downsample: int = 1,
+                 train: bool = True):
         """
         :param file: directory containing waveforms
         :param sample_len: length of returned sequence, should be smaller than approx 8'500'000
+        :param normalize_const: data is divided by this constant
+        :param downsample: only every n-th element is returned (default = 1, so every sample is returned)
         :param train: if true, the first 95% of files will be used for training and validation
                         else: the remaining 5% of files will be used for testing
         """
@@ -27,6 +34,8 @@ class CostaRicaSmall(Dataset):
         self.file = file
         self.sample_len = sample_len
         self.file_paths = glob.glob(os.path.join(self.file, '*.pt'))
+        self.normalize_const = 1.0 / float(normalize_const)
+        self.downsample = int(downsample)
         self.train = train
 
         self.num_test_examples = int(len(self.file_paths) * 0.95)
@@ -47,11 +56,12 @@ class CostaRicaSmall(Dataset):
 
     def __getitem__(self, idx):
         file_path = self.file_paths[idx]
-        data = torch.load(file_path)
+        data = torch.load(file_path) * self.normalize_const
 
-        start_idx = np.random.randint(0, data.shape[-1] - self.sample_len - 1)
-        x = data[start_idx:start_idx + self.sample_len].type(torch.FloatTensor)
-        y = data[start_idx + 1: start_idx + 1 + self.sample_len].type(torch.FloatTensor)
+        start_idx = np.random.randint(0, data.shape[-1] - (self.sample_len - 1) * self.downsample)
+        stop_idx = start_idx + self.sample_len * self.downsample
+        x = data[start_idx:stop_idx:self.downsample].type(torch.FloatTensor)
+        y = data[start_idx + self.downsample: stop_idx + self.downsample: self.downsample].type(torch.FloatTensor)
 
         # expand sequences to accommodate 'channel' (data is 1d)
         return x.unsqueeze(1), y.unsqueeze(-1)
@@ -84,13 +94,15 @@ def plot_first_examples(dataloader, num_examples=3, plot_len=None):
 
 def run_tests():
     data_path = 'data/costa_rica/small_subset'
-    sample_length = 1024
+    sample_length = 16_000
     batch_size = 32
     expected_num_train_files = 50
     expected_num_test_files = 3
+    normalize_by = 20_000
+    downsample = 500
 
-    train_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, train=True)
-    test_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, train=False)
+    train_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, normalize_const=normalize_by, downsample=downsample, train=True)
+    test_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, normalize_const=normalize_by, downsample=downsample, train=False)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
@@ -105,10 +117,13 @@ def run_tests():
 
     x, y = next(iter(train_loader))
 
+    print('x and y shapes:', x.shape, y.shape)
+
     print(f'x shape: {x.shape}, y shape: {y.shape}, expected shapes: {batch_size}, {sample_length}, {1}')
 
     # plot 3 examples, x and y should be shifted by one position
     plot_first_examples(train_loader, plot_len=100)
+    plot_first_examples(test_loader, plot_len=sample_length)
 
     test_sanity_check = False
     for f in train_file_paths:
@@ -116,9 +131,18 @@ def run_tests():
 
     print(f'test files found in training files: {test_sanity_check}')
 
-    val_split = 0.5
-    data_config = {'sample_len': sample_length, 'val_split': val_split}
-    loader_config = {'batch_size': batch_size, 'shuffle': True, 'num_workers': 0, 'pin_memory': True}
+    val_split = 0.1
+    data_config = {
+        'sample_len': sample_length,
+        'val_split': val_split,
+        'downsample': downsample,
+        'normalize_const': normalize_by,
+    }
+    loader_config = {
+        'batch_size': 1,
+        'shuffle': True,
+        'num_workers': 0,
+        'pin_memory': True}
     dataset_lightning = CostaRicaSmallLighting(data_dir=data_path, **data_config)
     train_loader_pl = dataset_lightning.train_dataloader(**loader_config)
     val_loader_pl = dataset_lightning.val_dataloader(**loader_config)
@@ -134,6 +158,20 @@ def run_tests():
           f'expected: {int(expected_num_train_files * val_split)}')
     print(f'number of test samples: {len(test_loader_pl.dataset)}, '
           f'expected: {expected_num_test_files}')
+
+    abs_max = 0
+    data_abs_max = None
+    for i, data in enumerate(train_loader_pl):
+        x, y = data
+        temp_max = torch.max(torch.abs(x))
+        print(i, temp_max)
+        if temp_max > abs_max:
+            abs_max = temp_max
+            data_abs_max = x
+    print(f'abs_max: {abs_max}')
+    plt.plot(data_abs_max[0, :, 0])
+    plt.suptitle(f'frame with maximimum amplitude: {abs_max}')
+    plt.show()
 
 
 if __name__ == '__main__':
