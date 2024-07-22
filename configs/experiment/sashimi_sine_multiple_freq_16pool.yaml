@@ -9,6 +9,8 @@ defaults:
   - /scheduler: plateau
   - /model: sashimi
 
+experiment_name: sashimi_sine_multiple_feq_16_pool
+
 model:
   d_model: 16
   n_layers: 8

@@ -9,6 +9,8 @@ defaults:
   - /scheduler: plateau
   - /model: sashimi
 
+experiment_name: sashimi_200hz_no_noise
+
 model:
   d_model: 16
   n_layers: 8
