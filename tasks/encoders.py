@@ -33,27 +33,22 @@ class LinearEncoder(Encoder):
         return self.linear(x)
 
 
-class LayerNormClassEncoder(Encoder):
-    def __init__(self, in_features, num_classes, out_features):
+class LayerNormLinearEncoder(Encoder):
+    def __init__(self, in_features, out_features):
         super().__init__(in_features, out_features)
-        self.lin_1 = nn.Linear(in_features, num_classes)
-        self.lin_2 = nn.Linear(num_classes, out_features)
         self.input_norm = nn.LayerNorm(in_features)
-        self.class_norm = nn.LayerNorm(num_classes)
+        self.linear = nn.Linear(in_features, out_features)
 
     def forward(self, x):
         x = self.input_norm(x)
-        x = self.lin_1(x)
-        x = F.relu(x)
-        x = self.class_norm(x)
-        x = self.lin_2(x)
+        x = self.linear(x)
         return x
 
 
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
-    'layernorm': LayerNormClassEncoder
+    'layernorm': LayerNormLinearEncoder
 }
 
 
