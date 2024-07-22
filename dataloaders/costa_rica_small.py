@@ -75,8 +75,20 @@ class CostaRicaSmallLighting(SequenceDataset):
     def setup(self):
         self.d_data = 1
 
-        self.dataset_train = CostaRicaSmall(self.data_dir, sample_len=self.hparams.sample_len, train=True)
-        self.dataset_test = CostaRicaSmall(self.data_dir, sample_len=self.hparams.sample_len, train=False)
+        self.dataset_train = CostaRicaSmall(
+            self.data_dir,
+            sample_len=self.hparams.sample_len,
+            train=True,
+            downsample=self.hparams.downsample,
+            normalize_const=self.hparams.normalize_const,
+        )
+        self.dataset_test = CostaRicaSmall(
+            self.data_dir,
+            sample_len=self.hparams.sample_len,
+            train=False,
+            downsample=self.hparams.downsample,
+            normalize_const=self.hparams.normalize_const,
+        )
         self.split_train_val(self.hparams.val_split)
 
 
@@ -160,6 +172,9 @@ def run_tests():
           f'expected: {int(expected_num_train_files * val_split)}')
     print(f'number of test samples: {len(test_loader_pl.dataset)}, '
           f'expected: {expected_num_test_files}')
+
+    print(f'dataset downsampling: {dataset_lightning.dataset_train.dataset.downsample}, expected: {downsample}')
+    print(f'dataset normalize_const: {dataset_lightning.dataset_train.dataset.normalize_const}, expected: {1.0 / normalize_by}')
 
     abs_max = 0
     data_abs_max = None
