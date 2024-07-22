@@ -35,7 +35,7 @@ task:
     - log_mse
 
 encoder:
-  _name_: layernorm
+  _name_: linear
 
 decoder:
   _name_: linear
