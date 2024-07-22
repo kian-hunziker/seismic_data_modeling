@@ -185,6 +185,7 @@ class LightningSequenceModel(pl.LightningModule):
 def create_trainer(config):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d__%H_%M_%S")
     model_name = config.model['_name_']
+    experiment_name = config.experiment_name
 
     # setup logger
 
@@ -198,7 +199,7 @@ def create_trainer(config):
     logger_wab = WandbLogger(
         project='MA',
         save_dir='wandb_logs',
-        name=model_name,
+        name=experiment_name,
         version=current_date,
     )
 
