@@ -1,3 +1,5 @@
+# @package _global_
+
 defaults:
   - /trainer: default
   - /loader: default
@@ -21,7 +23,7 @@ model:
 
 train:
   monitor: val/loss
-  mode: min
+  mode: max #change back to min
 
 task:
   metrics:

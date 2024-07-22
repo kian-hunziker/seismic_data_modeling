@@ -1,51 +1,18 @@
-#defaults:
-#  - dataset: mnist
-#  - model: dummy
-#  - optimizer: adam
-#  - scheduler: plateau
-#  - trainer: default
-#  - task: classification
-#  - loader: default
-
-#train:
-#  monitor: val/loss
-#  mode: min
+# @package _global_
 
 defaults:
-  - /trainer: default
-  - /loader: default
-  - /dataset: cr_small
-  - /task: regression
-  - /optimizer: adamw
-  - /scheduler: plateau
-  - /model: sashimi
-
-model:
-  n_layers: 8
-  expand: 2
-  ff: 2
-  pool:
-    - 16
-    - 16
-  dropout: 0.0
-  # prenorm: True
-  # layer:
-  #   n_ssm: 1
+  - _self_
+  #- dataset: mnist
+  #- model: dummy
+  #- optimizer: adam
+  #- scheduler: plateau
+  #- trainer: default
+  #- task: classification
+  #- loader: default
+  - experiment: sashimi_sine
 
 train:
   monitor: val/loss
   mode: min
 
-task:
-  metrics:
-    - mse
 
-
-loader:
-  batch_size: 45
-
-scheduler:
-  patience: 20
-
-trainer:
-  max_epochs: 1000
