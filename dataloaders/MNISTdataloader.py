@@ -20,6 +20,7 @@ class MNISTdataset(SequenceDataset):
         self.setup()
 
     def setup(self):
+        self.d_data = 1
         self.dataset_train = datasets.MNIST(root=self.data_dir, train=True, transform=self.transform, download=True)
         self.dataset_test = datasets.MNIST(root=self.data_dir, train=False, transform=self.transform, download=True)
         self.split_train_val(self.hparams.val_split)

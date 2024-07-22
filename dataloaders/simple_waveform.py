@@ -70,6 +70,7 @@ class SineWaveLightningDataset(SequenceDataset):
         self.setup()
 
     def setup(self):
+        self.d_data = 1
         self.dataset_train = SineWaveformDataset(self.data_dir, self.hparams.sample_len)
         self.split_train_val(self.hparams.val_split)
 

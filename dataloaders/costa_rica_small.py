@@ -73,6 +73,8 @@ class CostaRicaSmallLighting(SequenceDataset):
         self.setup()
 
     def setup(self):
+        self.d_data = 1
+
         self.dataset_train = CostaRicaSmall(self.data_dir, sample_len=self.hparams.sample_len, train=True)
         self.dataset_test = CostaRicaSmall(self.data_dir, sample_len=self.hparams.sample_len, train=False)
         self.split_train_val(self.hparams.val_split)

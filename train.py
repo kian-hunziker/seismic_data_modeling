@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 from dataloaders.MNISTdataloader import MNISTdataset
 from dataloaders.simple_waveform import SineWaveLightningDataset
 from models.simple_test_models import ConvNet
-from tasks.encoders import DummyEncoder, LinearEncoder, LayerNormClassEncoder
-from tasks.decoders import DummyDecoder, LinearDecoder
+from tasks.encoders import instantiate_encoder
+from tasks.decoders import instantiate_decoder
 from tasks.task import task_registry
 
 from utils.config_utils import instantiate
@@ -41,16 +41,18 @@ class LightningSequenceModel(pl.LightningModule):
         self.setup()
 
     def setup(self, stage=None):
-        self.encoder = LayerNormClassEncoder(
+        self.model = instantiate(registry.model, self.hparams.model)
+
+        self.encoder = instantiate_encoder(self.hparams.encoder, self.dataset, self.model)
+        '''LayerNormClassEncoder(
             in_features=1,
             out_features=self.hparams.model.d_model,
             num_classes=256
-        )
-        self.decoder = LinearDecoder(self.hparams.model.d_model, 1)
+        )'''
+        self.decoder = instantiate_decoder(self.hparams.decoder, self.dataset, self.model)
 
         #if self.hparams.model._name_ == "conv_net":
         #    self.model = ConvNet(self.hparams.model.in_channels, self.hparams.model.img_size)
-        self.model = instantiate(registry.model, self.hparams.model)
 
         self.task = instantiate(task_registry, self.hparams.task, dataset=self.dataset, model=self.model)
         self.criterion = self.task.loss

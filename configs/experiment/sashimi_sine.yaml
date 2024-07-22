@@ -10,6 +10,7 @@ defaults:
   - /model: sashimi
 
 model:
+  d_model: 16
   n_layers: 8
   expand: 2
   ff: 2
@@ -23,12 +24,18 @@ model:
 
 train:
   monitor: val/loss
-  mode: max #change back to min
+  mode: min
 
 task:
   metrics:
     - mse
 
+encoder:
+  _name_: layernorm
+  num_classes: 256
+
+decoder:
+  _name_: linear
 
 loader:
   batch_size: 32
