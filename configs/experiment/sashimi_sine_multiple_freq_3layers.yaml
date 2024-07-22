@@ -1,0 +1,51 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: sine/multiple_freq
+  - /task: regression
+  - /optimizer: adamw
+  - /scheduler: plateau
+  - /model: sashimi
+
+model:
+  d_model: 16
+  n_layers: 6
+  expand: 2
+  ff: 2
+  pool:
+    - 16
+    - 16
+    - 16
+  dropout: 0.0
+  # prenorm: True
+  # layer:
+  #   n_ssm: 1
+
+train:
+  monitor: val/loss
+  mode: min
+
+task:
+  metrics:
+    - mse
+
+encoder:
+  _name_: layernorm
+  num_classes: 256
+
+decoder:
+  _name_: linear
+
+loader:
+  batch_size: 64
+
+dataset:
+  sample_len: 4096
+
+scheduler:
+  patience: 20
+
+trainer:
+  max_epochs: 1000
