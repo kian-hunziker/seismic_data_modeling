@@ -36,7 +36,6 @@ task:
 
 encoder:
   _name_: layernorm
-  num_classes: 256
 
 decoder:
   _name_: linear

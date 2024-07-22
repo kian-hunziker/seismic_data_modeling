@@ -3,16 +3,16 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: sine/single_freq_very_noisy
+  - /dataset: cr_small
   - /task: regression
   - /optimizer: adamw
   - /scheduler: plateau
   - /model: sashimi
 
-experiment_name: sashimi_sine_200hz_very_noisy
+experiment_name: sashimi_cr_small
 
 model:
-  d_model: 16
+  d_model: 64
   n_layers: 8
   expand: 2
   ff: 2
@@ -30,20 +30,26 @@ train:
 
 task:
   metrics:
-    - mse
     - log_mse
+    - mse
 
 encoder:
-  _name_: layernorm
+  _name_: linear
 
 decoder:
   _name_: linear
 
 loader:
-  batch_size: 128
+  batch_size: 15
+
+dataset:
+  sample_len: 8000
+  downsample: 1
+  normalize_const: 30000
 
 scheduler:
   patience: 20
 
 trainer:
-  max_epochs: 1000
+  max_epochs: 10
+  log_every_n_steps: 1

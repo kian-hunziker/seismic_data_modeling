@@ -2,5 +2,5 @@ _name_: costarica-small
 data_dir: dataloaders/data/costa_rica/small_subset
 sample_len: 15872
 normalize_const: 20000
-downsample: 100
+downsample: 1
 val_split: 0.1
