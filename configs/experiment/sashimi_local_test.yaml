@@ -3,11 +3,13 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: sine
+  - /dataset: sine/small_single_freq
   - /task: regression
   - /optimizer: adamw
   - /scheduler: plateau
   - /model: sashimi
+
+experiment_name: sashimi_local_test
 
 model:
   d_model: 16
@@ -28,20 +30,21 @@ train:
 
 task:
   metrics:
+    - log_mse
     - mse
 
 encoder:
-  _name_: layernorm
-  num_classes: 256
+  _name_: linear
 
 decoder:
   _name_: linear
 
 loader:
-  batch_size: 32
+  batch_size: 4
 
 scheduler:
   patience: 20
 
 trainer:
-  max_epochs: 1000
+  max_epochs: 10
+  log_every_n_steps: 1
