@@ -9,6 +9,10 @@ def mse(output, target):
     return F.mse_loss(output, target)
 
 
+def log_mse(output, target):
+    return torch.log(F.mse_loss(output, target))
+
+
 def mae(output, target):
     return F.l1_loss(output, target)
 
@@ -30,6 +34,7 @@ def cross_entropy(output, target):
 
 metric_functions = {
     'mse': mse,
+    'log_mse': log_mse,
     'mae': mae,
     'accuracy': accuracy,
     'cross-entropy': cross_entropy
