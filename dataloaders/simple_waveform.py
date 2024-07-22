@@ -5,13 +5,28 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from dataloaders.base import SequenceDataset
+import omegaconf
 
 
 class SineWaveformDataset(Dataset):
-    def __init__(self, file: str = None, sample_len: int = 2048):
+    def __init__(self, data_dir: str = None,
+                 sample_len: int = 2048,
+                 min_freq: int = 80,
+                 max_freq: int = 2_000,
+                 num_frequencies: int = 0,
+                 num_random_amplitudes: int = 1,
+                 noise_amplitude: float = 0.1,
+                 overwrite_existing_file: bool = False):
         super().__init__()
-        self.file = file
+        self.file = data_dir
         self.sample_len = sample_len
+        self.min_freq = min_freq
+        self.max_freq = max_freq
+        self.num_frequencies = num_frequencies
+        self.num_random_amplitudes = num_random_amplitudes
+        self.noise_amplitude = noise_amplitude
+        self.overwrite_existing_file = overwrite_existing_file
+
         self.waveform_len = None
         self.data = None
         self.transform = transforms.Compose(
@@ -20,7 +35,7 @@ class SineWaveformDataset(Dataset):
         self.setup()
 
     def setup(self):
-        if os.path.isfile(self.file):
+        if os.path.isfile(self.file) and not self.overwrite_existing_file:
             self.data = np.load(self.file)
         else:
             self._generate_dataset()
@@ -28,24 +43,29 @@ class SineWaveformDataset(Dataset):
 
     def _generate_dataset(self):
         num_waveforms = 500
-        num_examples_per_freq = 20
-        len_waveform = 32_000
+        num_examples_per_freq = 1 + self.num_random_amplitudes
+        len_waveform = 4 * self.sample_len
         f_sampling = 16_000
-        n_frequencies = 400
-        min_freq = 10
-        max_freq = 4_000
 
-        frequencies = np.linspace(min_freq, max_freq, n_frequencies)
+        if self.num_frequencies == 1:
+            frequencies = [self.min_freq]
+        else:
+            frequencies = np.linspace(self.min_freq, self.max_freq, self.num_frequencies)
+
         t = np.linspace(0, len_waveform / f_sampling, len_waveform)
 
         data = np.zeros((len(frequencies) * num_examples_per_freq, len_waveform))
 
         for i in range(data.shape[0]):
-            f=frequencies[i//num_examples_per_freq]
-            data[i, :] = np.sin(2 * np.pi * f * t) * np.random.random()
+            f = frequencies[i // num_examples_per_freq]
+            if i % num_examples_per_freq == 0:
+                amp = 1.0
+            else:
+                amp = np.random.random()
+            data[i, :] = np.sin(2 * np.pi * f * t) * amp + self.noise_amplitude * np.random.normal(size=len_waveform)
 
-        #data = np.zeros((num_waveforms, len_waveform))
-        #for i in range(num_waveforms):
+        # data = np.zeros((num_waveforms, len_waveform))
+        # for i in range(num_waveforms):
         #    data[i, :] = np.sin(2 * np.pi * 100 * t) + 0.05 * np.random.normal(size=len_waveform)
 
         print(f'saving waveform data to {self.file}')
@@ -71,7 +91,16 @@ class SineWaveLightningDataset(SequenceDataset):
 
     def setup(self):
         self.d_data = 1
-        self.dataset_train = SineWaveformDataset(self.data_dir, self.hparams.sample_len)
+        self.dataset_train = SineWaveformDataset(
+            data_dir=self.hparams.data_dir,
+            sample_len=self.hparams.sample_len,
+            min_freq=self.hparams.min_freq,
+            max_freq=self.hparams.max_freq,
+            num_frequencies=self.hparams.num_frequencies,
+            num_random_amplitudes=self.hparams.num_random_amplitudes,
+            noise_amplitude=self.hparams.noise_amplitude,
+            overwrite_existing_file=self.hparams.overwrite_existing_file
+        )
         self.split_train_val(self.hparams.val_split)
 
 
@@ -80,30 +109,67 @@ def plot_examples(dataloader, num_examples=3, title=''):
     # plot 3 examples
     num_examples = 3
     fig, ax = plt.subplots(num_examples)
-    for a in ax:
-        x, y = next(data_iter)
-        a.plot(x[0].numpy())
+    x, y = next(data_iter)
+    for i, a in enumerate(ax):
+        a.plot(x[i].numpy())
     plt.suptitle(f'{title}\n{num_examples} random examples')
     plt.show()
 
 
-def sine_waveform_test():
-    dataset = SineWaveformDataset(file='data/basic_waveforms/sine_waveform_2.npy', sample_len=200)
+def single_freq_test():
+    dataset = SineWaveformDataset(
+        data_dir='data/basic_waveforms/sine_200hz.npy',
+        sample_len=200,
+        min_freq=200,
+        max_freq=200,
+        num_frequencies=1,
+        num_random_amplitudes=10,
+        noise_amplitude=0.1,
+        overwrite_existing_file=True
+    )
     dataloader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=0)
 
-    plot_examples(dataloader, title='Standard Dataloader')
+    plot_examples(dataloader, title='Single Freq')
 
-    print(len(dataloader))
+    print(f'len(dataloader) = {len(dataloader)}, expected: 11')
+
+
+def test_multiple_freq():
+    dataset = SineWaveformDataset(
+        data_dir='data/basic_waveforms/sine_multiple_freq.npy',
+        sample_len=200,
+        min_freq=80,
+        max_freq=2_000,
+        num_frequencies=500,
+        num_random_amplitudes=0,
+        noise_amplitude=0.1,
+        overwrite_existing_file=True
+    )
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
+    plot_examples(dataloader, title='Multiple freq')
+
+    print(f'len(dataloader) = {len(dataloader)}, expected: 500')
 
 
 def sine_waveforms_lightning_test():
-    dataset = SineWaveLightningDataset(data_dir='data/basic_waveforms/sine_waveform_2.npy',
-                                       **{'sample_len': 200, 'val_split': 0.1})
+    data_config = {
+        'data_dir': 'data/basic_waveforms/sine_lightning_test.npy',
+        'sample_len': 200,
+        'min_freq': 200,
+        'max_freq': 200,
+        'num_frequencies': 1,
+        'num_random_amplitudes': 200,
+        'noise_amplitude': 0.1,
+        'overwrite_existing_file': True,
+        'val_split': 0.1
+    }
+    dataset = SineWaveLightningDataset(**data_config)
     dataloader = dataset.train_dataloader(**{'batch_size': 32, 'shuffle': False})
     plot_examples(dataloader, title='Lightning Dataloader')
     print(dataset)
 
 
 if __name__ == '__main__':
-    sine_waveform_test()
+    single_freq_test()
+    test_multiple_freq()
     sine_waveforms_lightning_test()
