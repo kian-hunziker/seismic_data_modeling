@@ -27,7 +27,7 @@ def sash_generate_with_context(
     :param sashimi: Sashimi in rnn mode
     :param context: context for the generation
     :param seq_len: length of the sequence to generate after the context
-    :param device: device (e.g. 'cpu', 'mps' or 'cuda')
+    :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
     :return: context prediction, auto-regressive sequence
     """
 
@@ -43,7 +43,13 @@ def sash_generate_with_context(
     if context.dim() == 1:
         context = context.unsqueeze(-1).unsqueeze(-1)
 
-    state = sashimi.default_state()
+    sashimi = sashimi.to(device)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
+    context = context.to(device)
+
+    state = sashimi.default_state(device=device)
     context_len = len(context)
     context_output = []
     prediction_output = []
@@ -75,7 +81,7 @@ def sash_generate_with_context(
 
     context_output = torch.stack(context_output, dim=1)
     prediction_output = torch.stack(prediction_output, dim=1)
-    return context_output, prediction_output
+    return context_output.cpu(), prediction_output.cpu()
 
 
 def plot_predictions(
@@ -139,6 +145,7 @@ def plot_predictions(
 
 
 def sashimi_eval_test():
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     path = '../wandb_logs/MA/2024-07-22__15_29_38/checkpoints/epoch=219-step=15620.ckpt'
     pl_module, hparams = load_checkpoint(checkpoint_path=path)
     encoder, decoder, sash = get_pipeline_components(pl_module=pl_module)
@@ -153,7 +160,7 @@ def sashimi_eval_test():
     context_list = [a * np.sin(2 * np.pi * f * t_i) for t_i in t[:context_len]]
     context_torch = torch.from_numpy(context_np)[:context_len]
 
-    cp_np, pred_np = sash_generate_with_context(encoder, decoder, sash, context_np, prediction_len)
+    cp_np, pred_np = sash_generate_with_context(encoder, decoder, sash, context_np, prediction_len, device)
     cp_list, pred_list = sash_generate_with_context(encoder, decoder, sash, context_list, prediction_len)
     cp_torch, pred_torch = sash_generate_with_context(encoder, decoder, sash, context_torch, prediction_len)
 
