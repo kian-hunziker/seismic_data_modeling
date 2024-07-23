@@ -18,7 +18,7 @@ def sash_generate_with_context(
         device: str | torch.device = 'cpu'
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Inference using a Sashimi model. Model.setup_rnn() needs to be called before calling this function.
+    Inference using a Sashimi model.
     The context is used to condition the model. After that, the model generates a sequence of len seq_len
     in auto-regressive mode. Returns the predictions for the context and the auto-regressively generated sequence
 
@@ -46,6 +46,11 @@ def sash_generate_with_context(
     sashimi = sashimi.to(device)
     encoder = encoder.to(device)
     decoder = decoder.to(device)
+
+    sashimi.eval()
+    sashimi.setup_rnn()
+    encoder.eval()
+    decoder.eval()
 
     context = context.to(device)
 
