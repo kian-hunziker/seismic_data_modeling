@@ -47,7 +47,7 @@ class LayerNormLinearEncoder(Encoder):
 
 class MLPEncoder(Encoder):
     def __init__(self, in_features, out_features, hidden_features=256):
-        super().__init__(self, in_features, out_features)
+        super().__init__(in_features, out_features)
         self.linear1 = nn.Linear(in_features, hidden_features)
         self.linear2 = nn.Linear(hidden_features, out_features)
 

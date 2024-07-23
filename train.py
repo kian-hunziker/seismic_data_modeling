@@ -3,6 +3,7 @@ import hydra
 import omegaconf
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+from pytorch_lightning.utilities.model_summary import ModelSummary, LayerSummary
 import torch
 import numpy as np
 import pandas as pd
@@ -205,7 +206,6 @@ def create_trainer(config):
 
     loggers = [logger_t, logger_wab]
 
-
     # initialize trainer
     trainer = pl.Trainer(logger=loggers, **config.trainer)
     return trainer
@@ -213,15 +213,33 @@ def create_trainer(config):
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def main(config: OmegaConf) -> None:
-    print('Hello world')
+    print('*' * 32)
+    print('CONFIGURATION')
     print(OmegaConf.to_yaml(config))
+    print('*' * 32, '\n\n')
 
     trainer = create_trainer(config)
     model = LightningSequenceModel(config)
 
+    summary = ModelSummary(model, max_depth=1)
+    print('\n', '*' * 32, '\n')
+    print('SUMMARY')
+    print(summary)
+
+    print('\n', '*' * 32, '\n')
+    print('ENCODER')
+    print(model.encoder)
+    print('\n', '*' * 32, '\n')
+
+    print('DECODER')
+    print(model.decoder)
+    print('*' * 32, '\n\n')
+
     trainer.fit(model)
 
-    print(model)
+    print('\n', '*' * 32, '\n')
+    print('DONE')
+    print('\n', '*' * 32, '\n')
 
 
 if __name__ == '__main__':
