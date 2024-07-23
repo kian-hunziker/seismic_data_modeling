@@ -69,7 +69,10 @@ class SineWaveformDataset(Dataset):
         #    data[i, :] = np.sin(2 * np.pi * 100 * t) + 0.05 * np.random.normal(size=len_waveform)
 
         print(f'saving waveform data to {self.file}')
-        np.save(self.file, data)
+        try:
+            np.save(self.file, data)
+        except:
+            print('COULD NOT SAVE WAVEFORM DATA TO FILE')
 
         self.data = data
 
