@@ -45,10 +45,23 @@ class LayerNormLinearEncoder(Encoder):
         return x
 
 
+class MLPEncoder(Encoder):
+    def __init__(self, in_features, out_features, hidden_features=256):
+        super().__init__(self, in_features, out_features)
+        self.linear1 = nn.Linear(in_features, hidden_features)
+        self.linear2 = nn.Linear(hidden_features, out_features)
+
+    def forward(self, x):
+        x = F.relu(self.linear1(x))
+        x = self.linear2(x)
+        return x
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
-    'layernorm': LayerNormLinearEncoder
+    'layernorm': LayerNormLinearEncoder,
+    'mlp': MLPEncoder,
 }
 
 
