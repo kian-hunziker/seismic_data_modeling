@@ -92,6 +92,20 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
     in_features = dataset.d_data
     out_features = model.d_model
 
-    obj = instantiate(enc_registry, encoder, in_features=in_features, out_features=out_features)
+    if dataset.num_classes is not None:
+        obj = instantiate(
+            enc_registry,
+            encoder,
+            in_features=in_features,
+            out_features=out_features,
+            num_classes=dataset.num_classes
+        )
+    else:
+        obj = instantiate(
+            enc_registry,
+            encoder,
+            in_features=in_features,
+            out_features=out_features
+        )
 
     return obj
