@@ -1,18 +1,43 @@
 import os
 import yaml
 import torch
+import re
+import os
 import numpy as np
 from pytorch_lightning.utilities.model_summary import ModelSummary
 from train import LightningSequenceModel
 from models.sashimi.sashimi_standalone import Sashimi
 
 
+def _extract_step_number(filename):
+    match = re.search(r'step=(\d+)\.ckpt$', filename)
+    if match:
+        return int(match.group(1))
+    return None
+
+
 def load_checkpoint(checkpoint_path: str) -> tuple[LightningSequenceModel, dict]:
     """
-    Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu
+    Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
+    If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
+    step number is returned.
     :param checkpoint_path: path to checkpoint file. The hparams file is extracted automatically
     :return: LightningSequenceModel, hparams
     """
+    if not checkpoint_path.endswith('.ckpt'):
+        # the path does not directly lead to checkpoint, we search for checkpoints in directory
+        all_files = []
+
+        # Walk through directory and subdirectories
+        for root, dirs, files in os.walk(checkpoint_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                step_number = _extract_step_number(file)
+                if step_number is not None:
+                    all_files.append((step_number, file_path))
+        all_files.sort(key=lambda x: x[0])
+        checkpoint_path = all_files[-1][1]
+
     hparam_path = '/'.join(checkpoint_path.split('/')[:-2]) + '/hparams.yaml'
 
     if not os.path.isfile(checkpoint_path):
