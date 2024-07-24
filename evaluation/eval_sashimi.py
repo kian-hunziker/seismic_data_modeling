@@ -41,7 +41,7 @@ def sash_generate_with_context(
         context = context.type(torch.float32)
 
     if context.dim() == 1:
-        context = context.unsqueeze(-1).unsqueeze(-1)
+        context = context.unsqueeze(0).unsqueeze(-1)
 
     sashimi = sashimi.to(device)
     encoder = encoder.to(device)
@@ -55,7 +55,7 @@ def sash_generate_with_context(
     context = context.to(device)
 
     state = sashimi.default_state(device=device)
-    context_len = len(context)
+    context_len = context.shape[1]
     context_output = []
     prediction_output = []
 
@@ -66,7 +66,7 @@ def sash_generate_with_context(
         pbar = tqdm(total=context_len)
         pbar.set_description('Processing context')
         for i in range(context_len):
-            y = encoder(context[i])
+            y = encoder(context[:, i])
             y, state = sashimi.step(y, state)
             y = decoder(y, state)
             context_output.append(y.detach().cpu())
@@ -126,7 +126,7 @@ def plot_predictions(
     fig, ax = plt.subplots(figsize=fig_size)
     ax.plot(
         x[:len_context + len_prediction],
-        full_context[:len_context + len_prediction],
+        full_context[1:len_context + len_prediction + 1],
         label='actual context',
         linewidth=line_width,
     )
@@ -156,7 +156,7 @@ def sashimi_eval_test():
     encoder, decoder, sash = get_pipeline_components(pl_module=pl_module)
 
     t = np.linspace(0, 2, 32000)
-    context_len = 40
+    context_len = 256
     prediction_len = 200
     f = 200
     a = 0.8
