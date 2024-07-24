@@ -51,7 +51,10 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
         return None
 
     in_features = model.d_model
-    out_features = dataset.d_data
+    if dataset.num_classes is not None:
+        out_features = dataset.num_classes
+    else:
+        out_features = dataset.d_data
 
     obj = instantiate(dec_registry, decoder, in_features=in_features, out_features=out_features)
 

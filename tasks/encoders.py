@@ -57,11 +57,23 @@ class MLPEncoder(Encoder):
         return x
 
 
+class EmbeddingEncoder(Encoder):
+    def __init__(self, in_features, out_features, num_classes=256):
+        super().__init__(in_features, out_features)
+        self.embedding = nn.Embedding(num_classes, out_features)
+
+    def forward(self, x):
+        x = x.squeeze(-1)
+        x = self.embedding(x)
+        return x
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
     'layernorm': LayerNormLinearEncoder,
     'mlp': MLPEncoder,
+    'embedding': EmbeddingEncoder,
 }
 
 
