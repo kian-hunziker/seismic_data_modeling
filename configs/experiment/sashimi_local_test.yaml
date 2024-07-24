@@ -3,8 +3,8 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: sine/small_single_freq
-  - /task: regression
+  - /dataset: sine/small_single_freq_quant
+  - /task: classification
   - /optimizer: adamw
   - /scheduler: plateau
   - /model: sashimi
@@ -28,13 +28,9 @@ train:
   monitor: val/loss
   mode: min
 
-task:
-  metrics:
-    - log_mse
-    - mse
-
 encoder:
-  _name_: linear
+  _name_: embedding
+  num_classes: 256
 
 decoder:
   _name_: linear

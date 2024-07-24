@@ -9,7 +9,7 @@ defaults:
   - /scheduler: plateau
   - /model: sashimi
 
-experiment_name: sashimi_sine_multiple_feq_16_pool
+experiment_name: sashimi_sine_multiple_freq_16_pool
 
 model:
   d_model: 16
