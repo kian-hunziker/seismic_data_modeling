@@ -15,6 +15,7 @@ def sash_generate_with_context(
         sashimi: Sashimi,
         context: torch.Tensor | np.ndarray | list,
         seq_len: int,
+        quantized: bool = False,
         device: str | torch.device = 'cpu'
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
@@ -27,6 +28,7 @@ def sash_generate_with_context(
     :param sashimi: Sashimi in rnn mode
     :param context: context for the generation
     :param seq_len: length of the sequence to generate after the context
+    :param quantized: whether the model works with quantized data in a multiclass setting
     :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
     :return: context prediction, auto-regressive sequence
     """
@@ -53,6 +55,8 @@ def sash_generate_with_context(
     decoder.eval()
 
     context = context.to(device)
+    if quantized:
+        context = context.long()
 
     state = sashimi.default_state(device=device)
     context_len = context.shape[1]
@@ -69,6 +73,8 @@ def sash_generate_with_context(
             y = encoder(context[:, i])
             y, state = sashimi.step(y, state)
             y = decoder(y, state)
+            if quantized:
+                y = torch.argmax(y, dim=-1).unsqueeze(0)
             context_output.append(y.detach().cpu())
             pbar.update()
         pbar.close()
@@ -80,6 +86,8 @@ def sash_generate_with_context(
             y = encoder(y)
             y, state = sashimi.step(y, state)
             y = decoder(y, state)
+            if quantized:
+                y = torch.argmax(y, dim=-1).unsqueeze(0)
             prediction_output.append(y.detach().cpu())
             pbar.update()
         pbar.close()
