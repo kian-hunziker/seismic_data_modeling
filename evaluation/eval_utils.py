@@ -2,6 +2,7 @@ import os
 import yaml
 import torch
 import numpy as np
+from pytorch_lightning.utilities.model_summary import ModelSummary
 from train import LightningSequenceModel
 from models.sashimi.sashimi_standalone import Sashimi
 
@@ -49,3 +50,12 @@ def get_pipeline_components(pl_module: LightningSequenceModel):
         model.setup_rnn()
 
     return encoder, decoder, model
+
+
+def print_hparams(hparams: dict):
+    print(yaml.dump(hparams))
+
+
+def get_model_summary(model: LightningSequenceModel, max_depth=1):
+    summary = ModelSummary(model, max_depth=max_depth)
+    return summary
