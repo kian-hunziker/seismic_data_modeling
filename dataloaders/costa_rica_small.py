@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SequenceDataset
-from dataloaders.utils.costa_rica_utils import get_metadata, format_label
+from dataloaders.data_utils.costa_rica_utils import get_metadata, format_label
 
 
 class CostaRicaSmall(Dataset):

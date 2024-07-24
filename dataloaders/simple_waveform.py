@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from dataloaders.base import SequenceDataset
+from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
 import omegaconf
 
 
@@ -16,6 +17,8 @@ class SineWaveformDataset(Dataset):
                  num_frequencies: int = 0,
                  num_random_amplitudes: int = 1,
                  noise_amplitude: float = 0.1,
+                 quantize: bool = False,
+                 bits: int = 8,
                  overwrite_existing_file: bool = False):
         super().__init__()
         self.file = data_dir
@@ -25,6 +28,8 @@ class SineWaveformDataset(Dataset):
         self.num_frequencies = num_frequencies
         self.num_random_amplitudes = num_random_amplitudes
         self.noise_amplitude = noise_amplitude
+        self.quantize = quantize
+        self.bits = bits
         self.overwrite_existing_file = overwrite_existing_file
 
         self.waveform_len = None
@@ -42,7 +47,6 @@ class SineWaveformDataset(Dataset):
         self.waveform_len = self.data.shape[1]
 
     def _generate_dataset(self):
-        num_waveforms = 500
         num_examples_per_freq = 1 + self.num_random_amplitudes
         len_waveform = 4 * self.sample_len
         f_sampling = 16_000
@@ -67,6 +71,11 @@ class SineWaveformDataset(Dataset):
         # data = np.zeros((num_waveforms, len_waveform))
         # for i in range(num_waveforms):
         #    data[i, :] = np.sin(2 * np.pi * 100 * t) + 0.05 * np.random.normal(size=len_waveform)
+        if self.quantize:
+            data = normalize_11(data)
+            data = torch.from_numpy(data).float()
+            data = quantize_encode(data, bits=self.bits)
+            data = data.numpy()
 
         print(f'saving waveform data to {self.file}')
         try:
@@ -81,10 +90,14 @@ class SineWaveformDataset(Dataset):
 
     def __getitem__(self, idx):
         start_idx = np.random.randint(0, self.waveform_len - self.sample_len - 1)
-        x = self.data[idx, start_idx:start_idx + self.sample_len].astype(np.float32)
-        y = self.data[idx, start_idx + 1: start_idx + self.sample_len + 1].astype(np.float32)
 
-        return x[:, np.newaxis], y[:, np.newaxis]
+        x = self.data[idx, start_idx:start_idx + self.sample_len]
+        y = self.data[idx, start_idx + 1: start_idx + self.sample_len + 1]
+
+        if self.quantize:
+            return x[:, np.newaxis], y[:, np.newaxis]
+        else:
+            return x.astype(np.float32)[:, np.newaxis], y.astype(np.float32)[:, np.newaxis]
 
 
 class SineWaveLightningDataset(SequenceDataset):
@@ -102,9 +115,15 @@ class SineWaveLightningDataset(SequenceDataset):
             num_frequencies=self.hparams.num_frequencies,
             num_random_amplitudes=self.hparams.num_random_amplitudes,
             noise_amplitude=self.hparams.noise_amplitude,
+            quantize=self.hparams.quantize,
+            bits=self.hparams.bits,
             overwrite_existing_file=self.hparams.overwrite_existing_file
         )
         self.split_train_val(self.hparams.val_split)
+
+        # if the dataset is quantized, we must specify the number of classes
+        if self.dataset_train.dataset.quantize:
+            self.num_classes = 2 ** self.dataset_train.dataset.bits
 
 
 def plot_examples(dataloader, num_examples=3, title=''):
@@ -163,6 +182,7 @@ def sine_waveforms_lightning_test():
         'num_frequencies': 1,
         'num_random_amplitudes': 200,
         'noise_amplitude': 0.1,
+        'quantize': False,
         'overwrite_existing_file': True,
         'val_split': 0.1
     }
