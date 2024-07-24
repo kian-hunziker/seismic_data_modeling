@@ -23,6 +23,7 @@ class SequenceDataset(pl.LightningDataModule):
         self.dataset_train = self.dataset_val = self.dataset_test = None
 
         self.d_data = 1
+        self.num_classes = None
 
         self.init()
 
