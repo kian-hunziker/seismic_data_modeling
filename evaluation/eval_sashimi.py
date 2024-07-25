@@ -104,7 +104,8 @@ def plot_predictions(
         len_context: int,
         title: str = '',
         fig_size: tuple = (10, 5),
-        line_width: int = 3
+        line_width: int = 3,
+        save_path: str = None,
     ):
     """
     Plot context and predictions from auto-regressive generation
@@ -116,6 +117,7 @@ def plot_predictions(
     :param title: title of plot
     :param fig_size: size of figure
     :param line_width: width of lines in plot, default 3
+    :param save_path: if this is not none, the plot will be saved in save_path with the given title
     """
     if isinstance(full_context, torch.Tensor):
         full_context = full_context.detach().cpu().squeeze().numpy()
@@ -154,6 +156,8 @@ def plot_predictions(
     plt.legend()
     plt.suptitle(title)
     plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(os.path.join(save_path, '{}.png'.format(title)))
     plt.show()
 
 
