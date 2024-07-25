@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SequenceDataset
 from dataloaders.data_utils.costa_rica_utils import get_metadata, format_label
+from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
 
 
 class CostaRicaSmall(Dataset):
@@ -20,6 +21,8 @@ class CostaRicaSmall(Dataset):
                  sample_len: int = 2048,
                  normalize_const: float = 20000.0,
                  downsample: int = 1,
+                 quantize: bool = False,
+                 bits: int = 8,
                  train: bool = True):
         """
         :param file: directory containing waveforms
@@ -36,7 +39,12 @@ class CostaRicaSmall(Dataset):
         self.file_paths = glob.glob(os.path.join(self.file, '*.pt'))
         self.normalize_const = 1.0 / float(normalize_const)
         self.downsample = int(downsample)
+        self.quantize = quantize
+        self.bits = int(bits)
         self.train = train
+
+        self.data_min = -783285
+        self.data_max = 534546
 
         self.num_test_examples = int(len(self.file_paths) * 0.95)
 
@@ -56,15 +64,27 @@ class CostaRicaSmall(Dataset):
 
     def __getitem__(self, idx):
         file_path = self.file_paths[idx]
-        data = torch.load(file_path) * self.normalize_const
+        data = torch.load(file_path)
+
+        if not self.quantize:
+            data = data * self.normalize_const
 
         start_idx = np.random.randint(0, data.shape[-1] - (self.sample_len - 1) * self.downsample)
         stop_idx = start_idx + self.sample_len * self.downsample
-        x = data[start_idx:stop_idx:self.downsample].type(torch.FloatTensor)
-        y = data[start_idx + self.downsample: stop_idx + self.downsample: self.downsample].type(torch.FloatTensor)
 
         # expand sequences to accommodate 'channel' (data is 1d)
-        return x.unsqueeze(1), y.unsqueeze(-1)
+        if not self.quantize:
+            x = data[start_idx:stop_idx:self.downsample].type(torch.FloatTensor)
+            y = data[start_idx + self.downsample: stop_idx + self.downsample: self.downsample].type(torch.FloatTensor)
+            return x.unsqueeze(1), y.unsqueeze(-1)
+        else:
+            # quantize the data
+            x_plus_one = data[start_idx:stop_idx + self.downsample:self.downsample].type(torch.FloatTensor)
+            x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
+            encoded = quantize_encode(x_plus_one, self.bits)
+            x = encoded[:-1]
+            y = encoded[1:]
+            return x.unsqueeze(1), y.unsqueeze(-1)
 
 
 class CostaRicaSmallLighting(SequenceDataset):
@@ -81,6 +101,8 @@ class CostaRicaSmallLighting(SequenceDataset):
             train=True,
             downsample=self.hparams.downsample,
             normalize_const=self.hparams.normalize_const,
+            quantize=self.hparams.quantize,
+            bits=self.hparams.bits,
         )
         self.dataset_test = CostaRicaSmall(
             self.data_dir,
@@ -88,8 +110,13 @@ class CostaRicaSmallLighting(SequenceDataset):
             train=False,
             downsample=self.hparams.downsample,
             normalize_const=self.hparams.normalize_const,
+            quantize=self.hparams.quantize,
+            bits=self.hparams.bits,
         )
         self.split_train_val(self.hparams.val_split)
+
+        if self.dataset_train.dataset.quantize:
+            self.num_classes = 2 ** self.dataset_train.dataset.bits
 
 
 def plot_first_examples(dataloader, num_examples=3, plot_len=None):
@@ -115,8 +142,10 @@ def run_tests():
     normalize_by = 20_000
     downsample = 500
 
-    train_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, normalize_const=normalize_by, downsample=downsample, train=True)
-    test_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, normalize_const=normalize_by, downsample=downsample, train=False)
+    train_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, normalize_const=normalize_by,
+                                   downsample=downsample, train=True)
+    test_dataset = CostaRicaSmall(file=data_path, sample_len=sample_length, normalize_const=normalize_by,
+                                  downsample=downsample, train=False)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
@@ -151,6 +180,8 @@ def run_tests():
         'val_split': val_split,
         'downsample': downsample,
         'normalize_const': normalize_by,
+        'quantize': True,
+        'bits': 8
     }
     loader_config = {
         'batch_size': 1,
@@ -174,7 +205,8 @@ def run_tests():
           f'expected: {expected_num_test_files}')
 
     print(f'dataset downsampling: {dataset_lightning.dataset_train.dataset.downsample}, expected: {downsample}')
-    print(f'dataset normalize_const: {dataset_lightning.dataset_train.dataset.normalize_const}, expected: {1.0 / normalize_by}')
+    print(
+        f'dataset normalize_const: {dataset_lightning.dataset_train.dataset.normalize_const}, expected: {1.0 / normalize_by}')
 
     abs_max = 0
     data_abs_max = None

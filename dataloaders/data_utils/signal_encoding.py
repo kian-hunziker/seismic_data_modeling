@@ -3,26 +3,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def normalize_11(data: np.ndarray) -> np.ndarray:
+def normalize_11(data: np.ndarray, d_min=None, d_max=None) -> np.ndarray:
     """
     Normalize numpy array to range [-1, 1]
     :param data: unnormalized data
     :return: normalized data
     """
-    d_min = np.min(data)
-    d_max = np.max(data)
+    if d_min is not None:
+        d_min = np.min(data)
+    if d_max is not None:
+        d_max = np.max(data)
     data = 2 * ((data - d_min) / (d_max - d_min)) - 1
     return data
 
 
-def normalize_11_torch(data: torch.Tensor) -> torch.Tensor:
+def normalize_11_torch(data: torch.Tensor, d_min=None, d_max=None) -> torch.Tensor:
     """
     Normalize torch tensor to range [-1, 1]
     :param data: unnormalized data
     :return: normalized data as torch.Tensor
     """
-    d_min = torch.min(data)
-    d_max = torch.max(data)
+    if d_min is not None:
+        d_min = torch.min(data)
+    if d_max is not None:
+        d_max = torch.max(data)
     data = 2 * ((data - d_min) / (d_max - d_min)) - 1
     return data
 
