@@ -80,7 +80,7 @@ class CostaRicaSmall(Dataset):
         else:
             # quantize the data
             x_plus_one = data[start_idx:stop_idx + self.downsample:self.downsample].type(torch.FloatTensor)
-            x_plus_one = torch.sqrt(x_plus_one) * torch.sign(x_plus_one)
+            x_plus_one = torch.sqrt(torch.abs(x_plus_one)) * torch.sign(x_plus_one)
             x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
             encoded = quantize_encode(x_plus_one, self.bits)
             x = encoded[:-1]
