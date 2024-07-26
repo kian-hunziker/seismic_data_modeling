@@ -83,7 +83,6 @@ def mu_law_encode(signal: torch.Tensor, bits: int = 8) -> torch.Tensor:
     denominator = torch.log1p(mu)
     encoded = torch.sign(signal) * (numerator / denominator)
 
-    # Quantize signal to the specified number of levels.
     return (encoded + 1) / 2  # * mu + 0.5
 
 
