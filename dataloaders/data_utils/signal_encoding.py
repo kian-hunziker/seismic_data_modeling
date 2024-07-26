@@ -9,9 +9,9 @@ def normalize_11(data: np.ndarray, d_min=None, d_max=None) -> np.ndarray:
     :param data: unnormalized data
     :return: normalized data
     """
-    if d_min is not None:
+    if d_min is None:
         d_min = np.min(data)
-    if d_max is not None:
+    if d_max is None:
         d_max = np.max(data)
     data = 2 * ((data - d_min) / (d_max - d_min)) - 1
     return data
@@ -23,9 +23,9 @@ def normalize_11_torch(data: torch.Tensor, d_min=None, d_max=None) -> torch.Tens
     :param data: unnormalized data
     :return: normalized data as torch.Tensor
     """
-    if d_min is not None:
+    if d_min is None:
         d_min = torch.min(data)
-    if d_max is not None:
+    if d_max is None:
         d_max = torch.max(data)
     data = 2 * ((data - d_min) / (d_max - d_min)) - 1
     return data
