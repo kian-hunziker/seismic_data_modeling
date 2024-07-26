@@ -97,6 +97,46 @@ def sash_generate_with_context(
     return context_output.cpu(), prediction_output.cpu()
 
 
+def sash_generate_without_context(
+        encoder: nn.Module,
+        decoder: nn.Module,
+        sashimi: Sashimi,
+        seq_len: int,
+        quantized: bool = False,
+        device: str | torch.device = 'cpu'
+):
+    sashimi = sashimi.to(device)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
+    sashimi.eval()
+    sashimi.setup_rnn()
+    encoder.eval()
+    decoder.eval()
+
+    # default state
+    state = sashimi.default_state()
+
+    # initial input
+    if quantized:
+        y = torch.zeros(1, 1).long()
+    else:
+        y = torch.zeros(1, 1)
+    ys = []
+
+    # auto-regressive generation
+    for _ in tqdm(range(seq_len)):
+        y = encoder(y)
+        y, state = sashimi.step(y, state)
+        y = decoder(y, state)
+        if quantized:
+            y = torch.argmax(y, dim=-1).unsqueeze(0)
+        ys.append(y.detach().cpu())
+
+    out = torch.stack(ys, dim=1)  # y.shape == x.shape
+    return out
+
+
 def plot_predictions(
         full_context: torch.Tensor | np.ndarray | list,
         predicted_context: torch.Tensor | np.ndarray | list,
@@ -106,7 +146,8 @@ def plot_predictions(
         fig_size: tuple = (10, 5),
         line_width: int = 3,
         save_path: str = None,
-    ):
+        show: bool = True,
+):
     """
     Plot context and predictions from auto-regressive generation
     :param full_context: tensor, np.ndarray or list containing the context and ground truth
@@ -118,6 +159,7 @@ def plot_predictions(
     :param fig_size: size of figure
     :param line_width: width of lines in plot, default 3
     :param save_path: if this is not none, the plot will be saved in save_path with the given title
+    :param show: if true, plot.show() is called
     """
     if isinstance(full_context, torch.Tensor):
         full_context = full_context.detach().cpu().squeeze().numpy()
@@ -158,7 +200,8 @@ def plot_predictions(
     plt.tight_layout()
     if save_path is not None:
         plt.savefig(os.path.join(save_path, '{}.png'.format(title)))
-    plt.show()
+    if show:
+        plt.show()
 
 
 def sashimi_eval_test():
