@@ -108,6 +108,7 @@ def generate_with_context(
             save_path=save_path,
             show=show
         )
+        plt.close()
 
 
 def eval_train_and_test(
