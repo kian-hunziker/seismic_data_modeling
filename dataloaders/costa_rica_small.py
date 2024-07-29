@@ -59,12 +59,42 @@ class CostaRicaSmall(Dataset):
             label = format_label(file_path.split('/')[-1])
             self.label_to_path[label] = file_path
 
+        self.tuple_list = []
+        self._setup_tuples()
+
+    def _setup_tuples(self):
+        year_day_list = []
+        for file in self.file_paths:
+            name = file.split('/')[-1]
+            meta = get_metadata(name)
+            year_day_list.append((meta['year'], meta['day'], file))
+
+        # sort list by year and day
+        year_day_list = sorted(year_day_list, key=lambda x: x[0] + x[1])
+
+        # construct tuples of consecutive recordings
+        for a, b in zip(year_day_list[:-1], year_day_list[1:]):
+            if a[0] == b[0] and int(a[1]) == int(b[1]) - 1:
+                self.tuple_list.append((a[-1], b[-1]))
+            else:
+                self.tuple_list.append((a[-1], None))
+                self.tuple_list.append((b[-1], None))
+
     def __len__(self):
-        return len(self.file_paths)
+        return len(self.tuple_list)
 
     def __getitem__(self, idx):
-        file_path = self.file_paths[idx]
-        data = torch.load(file_path)
+        #file_path = self.file_paths[idx]
+        #data = torch.load(file_path)
+        f_1 = self.tuple_list[idx][0]
+        f_2 = self.tuple_list[idx][1]
+
+        data_1 = torch.load(f_1)
+        if f_2 is not None:
+            data_2 = torch.load(self.tuple_list[idx][1])
+            data = torch.cat((data_1, data_2))
+        else:
+            data = data_1
 
         if not self.quantize:
             data = data * self.normalize_const
