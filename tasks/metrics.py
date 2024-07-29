@@ -9,6 +9,10 @@ def mse(output, target):
     return F.mse_loss(output, target)
 
 
+def mse_with_context(output, target, context_len):
+    return F.mse_loss(output[:, context_len:], target[:, context_len:])
+
+
 def log_mse(output, target):
     return torch.log(F.mse_loss(output, target))
 
@@ -32,10 +36,20 @@ def cross_entropy(output, target):
     return F.cross_entropy(output, target)
 
 
+def cross_entropy_with_context(output, target, context_len):
+    output = output[:, context_len:]
+    target = target[:, context_len:]
+    output = output.reshape(-1, output.shape[-1])
+    target = target.reshape(-1)
+    return F.cross_entropy(output, target)
+
+
 metric_functions = {
     'mse': mse,
     'log_mse': log_mse,
+    'mse-context': mse_with_context,
     'mae': mae,
     'accuracy': accuracy,
-    'cross-entropy': cross_entropy
+    'cross-entropy': cross_entropy,
+    'cross-entropy-context': cross_entropy_with_context,
 }

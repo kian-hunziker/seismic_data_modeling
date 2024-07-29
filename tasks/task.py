@@ -9,7 +9,7 @@ from utils.config_utils import instantiate, to_list
 
 
 class Task:
-    def __init__(self, dataset=None, model=None, loss=None, loss_val=None, metrics=None):
+    def __init__(self, dataset=None, model=None, loss=None, loss_val=None, metrics=None, **kwargs):
         self.dataset = dataset
         self.model = model
         if metrics is None: metrics = []

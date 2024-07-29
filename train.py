@@ -86,10 +86,15 @@ class LightningSequenceModel(pl.LightningModule):
     def _step_with_metrics(self, batch, batch_idx, prefix='train'):
         x, y = self.forward(batch, batch_idx)
 
-        if prefix == 'train':
-            loss = self.criterion(x, y)
+        if 'context_len' in self.hparams.task:
+            args = {'context_len': self.hparams.task.context_len}
         else:
-            loss = self.loss_val(x, y)
+            args = {}
+
+        if prefix == 'train':
+            loss = self.criterion(x, y, **args)
+        else:
+            loss = self.loss_val(x, y, **args)
 
         metrics = self.metrics(x, y)
         metrics['loss'] = loss
