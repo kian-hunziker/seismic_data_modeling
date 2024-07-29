@@ -99,7 +99,7 @@ class CostaRicaSmall(Dataset):
         if not self.quantize:
             data = data * self.normalize_const
 
-        start_idx = np.random.randint(0, data.shape[-1] - (self.sample_len - 1) * self.downsample)
+        start_idx = np.random.randint(0, data.shape[-1] - (self.sample_len + 1) * self.downsample)
         stop_idx = start_idx + self.sample_len * self.downsample
 
         # expand sequences to accommodate 'channel' (data is 1d)
