@@ -16,6 +16,7 @@ def sash_generate_with_context(
         context: torch.Tensor | np.ndarray | list,
         seq_len: int,
         quantized: bool = False,
+        rnn_mode: str = 'diagonal',
         device: str | torch.device = 'cpu'
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
@@ -30,6 +31,8 @@ def sash_generate_with_context(
     :param seq_len: length of the sequence to generate after the context
     :param quantized: whether the model works with quantized data in a multiclass setting
     :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
+    :param rnn_mode: S4 recurrence mode, e.g. 'diagonal', 'dense', 'linear'. 'diagonal' should be the fastest
+            but might be unstable.
     :return: context prediction, auto-regressive sequence
     """
 
@@ -50,7 +53,7 @@ def sash_generate_with_context(
     decoder = decoder.to(device)
 
     sashimi.eval()
-    sashimi.setup_rnn()
+    sashimi.setup_rnn(mode=rnn_mode)
     encoder.eval()
     decoder.eval()
 
@@ -103,6 +106,7 @@ def sash_generate_without_context(
         sashimi: Sashimi,
         seq_len: int,
         quantized: bool = False,
+        rnn_mode: str = 'diagonal',
         device: str | torch.device = 'cpu'
 ):
     sashimi = sashimi.to(device)
@@ -110,7 +114,7 @@ def sash_generate_without_context(
     decoder = decoder.to(device)
 
     sashimi.eval()
-    sashimi.setup_rnn()
+    sashimi.setup_rnn(mode=rnn_mode)
     encoder.eval()
     decoder.eval()
 
