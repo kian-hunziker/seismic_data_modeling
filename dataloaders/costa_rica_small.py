@@ -46,23 +46,6 @@ class CostaRicaSmall(Dataset):
         self.data_min = -np.sqrt(783285)
         self.data_max = np.sqrt(783285)
 
-        self.num_test_examples = int(len(self.file_paths) * 0.95)
-
-        if self.train:
-            self.file_paths = self.file_paths[:self.num_test_examples]
-        else:
-            self.file_paths = self.file_paths[self.num_test_examples:]
-
-        # mapping from label strings to file paths
-        self.label_to_path = {}
-        for file_path in self.file_paths:
-            label = format_label(file_path.split('/')[-1])
-            self.label_to_path[label] = file_path
-
-        self.tuple_list = []
-        self._setup_tuples()
-
-    def _setup_tuples(self):
         year_day_list = []
         for file in self.file_paths:
             name = file.split('/')[-1]
@@ -73,12 +56,30 @@ class CostaRicaSmall(Dataset):
         year_day_list = sorted(year_day_list, key=lambda x: x[0] + x[1])
 
         # construct tuples of consecutive recordings
+        self.tuple_list = []
         for a, b in zip(year_day_list[:-1], year_day_list[1:]):
             if a[0] == b[0] and int(a[1]) == int(b[1]) - 1:
                 self.tuple_list.append((a[-1], b[-1]))
-            else:
-                self.tuple_list.append((a[-1], None))
-                self.tuple_list.append((b[-1], None))
+            #else:
+            #    self.tuple_list.append((a[-1], None))
+            #    self.tuple_list.append((b[-1], None))
+
+        # sort file_paths
+        self.file_paths = [f for y, d, f in year_day_list]
+        self.num_train_examples = int(len(self.file_paths) * 0.95)
+
+        if self.train:
+            self.file_paths = self.file_paths[:self.num_train_examples]
+        else:
+            self.file_paths = self.file_paths[self.num_train_examples:]
+
+        # mapping from label strings to file paths
+        self.label_to_path = {}
+        for file_path in self.file_paths:
+            label = format_label(file_path.split('/')[-1])
+            self.label_to_path[label] = file_path
+
+
 
     def __len__(self):
         return len(self.tuple_list)
