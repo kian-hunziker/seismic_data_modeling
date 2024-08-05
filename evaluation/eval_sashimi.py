@@ -1,12 +1,34 @@
 import os
 import yaml
+import copy
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
 from models.sashimi.sashimi_standalone import Sashimi
 from evaluation.eval_utils import load_checkpoint, get_pipeline_components
 import matplotlib.pyplot as plt
+
+
+def greedy_prediction(pred: torch.Tensor):
+    """
+    Greedy prediction. Argmax(pred)
+    :param pred: predictions [1, num_classes]
+    :return: greedy prediction [1, 1]
+    """
+    return torch.argmax(pred, dim=-1).unsqueeze(0)
+
+
+def multinomial_prediction(pred: torch.Tensor, temperature: float = 1.0):
+    """
+    Sample from predictions using softmax and multinomial distribution.
+    :param pred: predictions [1, num_classes]
+    :param temperature: temperature for softmax. Default: 1.0
+    :return: sampled prediction [1, 1]
+    """
+    pred = pred / temperature
+    return torch.multinomial(F.softmax(pred, dim=1), 1)
 
 
 def sash_generate_with_context(
@@ -17,8 +39,11 @@ def sash_generate_with_context(
         seq_len: int,
         quantized: bool = False,
         rnn_mode: str = 'diagonal',
+        greedy: bool = True,
+        num_predictions: int = 1,
+        temperature: float = 1.0,
         device: str | torch.device = 'cpu'
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, list[torch.Tensor]]:
     """
     Inference using a Sashimi model.
     The context is used to condition the model. After that, the model generates a sequence of len seq_len
@@ -30,10 +55,13 @@ def sash_generate_with_context(
     :param context: context for the generation
     :param seq_len: length of the sequence to generate after the context
     :param quantized: whether the model works with quantized data in a multiclass setting
-    :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
     :param rnn_mode: S4 recurrence mode, e.g. 'diagonal', 'dense', 'linear'. 'diagonal' should be the fastest
             but might be unstable.
-    :return: context prediction, auto-regressive sequence
+    :param greedy: If true, use greedy prediction (argmax(pred)), else use probabilistic sampling with softmax
+    :param num_predictions: number of auto-regressive predictions.
+    :param temperature: temperature for softmax sampling
+    :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
+    :return: context prediction, auto-regressive sequences. The first element of the predictions is greedy
     """
 
     assert isinstance(sashimi, Sashimi)
@@ -64,7 +92,7 @@ def sash_generate_with_context(
     state = sashimi.default_state(device=device)
     context_len = context.shape[1]
     context_output = []
-    prediction_output = []
+    all_predictions = []
 
     # inference in recurrent mode
     with torch.no_grad():
@@ -83,21 +111,34 @@ def sash_generate_with_context(
         pbar.close()
 
         # Auto-regressive generation. The output of the model is used as the next input.
-        pbar = tqdm(total=seq_len)
-        pbar.set_description('Auto-regressive generation')
-        for i in range(seq_len):
-            y = encoder(y)
-            y, state = sashimi.step(y, state)
-            y = decoder(y, state)
-            if quantized:
-                y = torch.argmax(y, dim=-1).unsqueeze(0)
-            prediction_output.append(y.detach().cpu())
-            pbar.update()
-        pbar.close()
+        conditioned_state = copy.deepcopy(state)
+        if greedy:
+            num_predictions = 1
+
+        for i in range(num_predictions):
+            prediction_output = []
+            y = context_output[-1]
+            state = copy.deepcopy(conditioned_state)
+
+            pbar = tqdm(total=seq_len)
+            pbar.set_description(f'Auto-regressive generation {i + 1} / {num_predictions}')
+            for _ in range(seq_len):
+                y = encoder(y)
+                y, state = sashimi.step(y, state)
+                y = decoder(y, state)
+                if quantized:
+                    if greedy or i == 0:
+                        y = greedy_prediction(y)
+                    else:
+                        y = multinomial_prediction(y, temperature=temperature)
+                prediction_output.append(y.detach().cpu())
+                pbar.update()
+            all_predictions.append(torch.stack(prediction_output, dim=1).cpu())
+            pbar.close()
 
     context_output = torch.stack(context_output, dim=1)
-    prediction_output = torch.stack(prediction_output, dim=1)
-    return context_output.cpu(), prediction_output.cpu()
+    #prediction_output = torch.stack(prediction_output, dim=1)
+    return context_output.cpu(), all_predictions
 
 
 def sash_generate_without_context(
@@ -170,13 +211,13 @@ def plot_predictions(
     if isinstance(predicted_context, torch.Tensor):
         predicted_context = predicted_context.detach().cpu().squeeze().numpy()
     if isinstance(auto_reg_prediction, torch.Tensor):
-        auto_reg_prediction = auto_reg_prediction.detach().cpu().squeeze().numpy()
+        auto_reg_prediction = [auto_reg_prediction]
 
     provided_context = full_context[:len_context]
-    len_prediction = len(auto_reg_prediction)
+    len_prediction = len(auto_reg_prediction[0].squeeze())
 
     # x axis
-    x = np.arange(len(provided_context) + len(auto_reg_prediction))
+    x = np.arange(len_context + len_prediction)
 
     # plotting
     fig, ax = plt.subplots(figsize=fig_size)
@@ -192,9 +233,18 @@ def plot_predictions(
         label='predicted context',
         linewidth=line_width,
     )
+    for i in range(len(auto_reg_prediction) - 1):
+        ax.plot(
+            x[len(provided_context):],
+            auto_reg_prediction[i + 1].detach().cpu().squeeze().numpy(),
+            color='green',
+            alpha=0.2,
+            linewidth=line_width,
+        )
     ax.plot(
         x[len(provided_context):],
-        auto_reg_prediction,
+        auto_reg_prediction[0].detach().cpu().squeeze().numpy(),
+        color='green',
         label='auto-regressive',
         linewidth=line_width,
     )
