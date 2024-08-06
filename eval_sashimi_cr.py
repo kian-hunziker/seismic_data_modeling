@@ -141,6 +141,10 @@ def eval_train_and_test(
     # setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    print('*' * 32, '\n')
+    print(f'Using device: {device}\n')
+    print('*' * 32, '\n')
+
     # load module and hyperparameters from checkpoint
     pl_module, hparams, quantize, save_dir = setup_evaluation(path)
 
