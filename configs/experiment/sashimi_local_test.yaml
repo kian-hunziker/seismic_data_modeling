@@ -3,17 +3,17 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: sine/small_single_freq_quant
+  - /dataset: cr_small
   - /task: classification
   - /optimizer: adamw
-  - /scheduler: plateau
+  - /scheduler: cosine_warmup
   - /model: sashimi
 
 experiment_name: sashimi_local_test
 
 model:
   d_model: 16
-  n_layers: 8
+  n_layers: 4
   expand: 2
   ff: 2
   pool:
@@ -35,11 +35,20 @@ decoder:
   _name_: linear
 
 loader:
-  batch_size: 4
+  batch_size: 5
 
 scheduler:
-  patience: 20
+  num_warmup_steps: 10
+  num_training_steps: 50
 
 trainer:
   max_epochs: 10
   log_every_n_steps: 1
+
+dataset:
+  sample_len: 8000
+  quantize: True
+
+task:
+  loss: cross-entropy-context
+  context_len: 1000
