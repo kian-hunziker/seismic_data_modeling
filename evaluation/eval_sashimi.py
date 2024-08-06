@@ -258,6 +258,78 @@ def plot_predictions(
         plt.show()
 
 
+def plot_multiple_predictions(
+        full_context: torch.Tensor | np.ndarray | list,
+        predicted_context: torch.Tensor | np.ndarray | list,
+        auto_reg_prediction: list,
+        len_context: int,
+        title: str = '',
+        fig_size: tuple = (10, 5),
+        line_width: int = 3,
+        save_path: str = None,
+        show: bool = True,
+):
+    if isinstance(full_context, torch.Tensor):
+        full_context = full_context.detach().cpu().squeeze().numpy()
+    if isinstance(predicted_context, torch.Tensor):
+        predicted_context = predicted_context.detach().cpu().squeeze().numpy()
+
+    greedy_pred = auto_reg_prediction[0].squeeze().numpy()
+    preds_np = [p.detach().cpu().squeeze().unsqueeze(0).numpy() for p in auto_reg_prediction]
+    len_prediction = len(greedy_pred)
+
+    x = np.arange(len_context + len_prediction)
+
+    fig, ax = plt.subplots(figsize=fig_size)
+    # plot context
+    ax.plot(
+        x[:len_context + len_prediction],
+        full_context[1: len_context + len_prediction + 1],
+        label='Context',
+        linewidth=line_width,
+    )
+    # plot next sample predictions for context
+    ax.plot(
+        x[:len_context],
+        predicted_context,
+        label='next sample predictions',
+        linewidth=line_width,
+        color='orange'
+    )
+    # plot mean of multiple autoregressive predictions
+    ax.plot(
+        x[len_context:],
+        np.mean(preds_np[1:], axis=0)[0],
+        label='mean prediction',
+        linewidth=line_width,
+        color='green'
+    )
+    # plot greedy prediction
+    ax.plot(
+        x[len_context:],
+        greedy_pred,
+        label='greedy prediction',
+        linewidth=line_width,
+        color='red'
+    )
+    # plot confidence interval
+    ax.fill_between(
+        x[len_context:],
+        np.percentile(preds_np[1:], 5, axis=0)[0],
+        np.percentile(preds_np[1:], 95, axis=0)[0],
+        alpha=0.5,
+        label='5% and 95% confidence interval',
+        color='green'
+    )
+    plt.legend()
+    plt.suptitle(title)
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(os.path.join(save_path, '{}.png'.format(title)))
+    if show:
+        plt.show()
+
+
 def sashimi_eval_test():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     path = '../wandb_logs/MA/2024-07-22__15_29_38/checkpoints/epoch=219-step=15620.ckpt'

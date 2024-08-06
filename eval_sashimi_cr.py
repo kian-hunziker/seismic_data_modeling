@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch
 from evaluation.eval_sashimi import sash_generate_with_context, sash_generate_without_context, plot_predictions
+from evaluation.eval_sashimi import plot_multiple_predictions
 from evaluation.eval_utils import load_checkpoint, get_pipeline_components, print_hparams, get_model_summary
 from train import LightningSequenceModel
 import matplotlib.pyplot as plt
@@ -66,6 +67,8 @@ def generate_with_context(
         description: str = '',
         context_split: float = 0.8,
         quantize: bool = False,
+        greedy: bool = True,
+        num_predictions: int = 1,
         device: str = 'cpu'
 ):
     encoder, decoder, model = get_pipeline_components(pl_module)
@@ -94,20 +97,36 @@ def generate_with_context(
             context=context[:context_len],
             seq_len=generation_len,
             quantized=quantize,
+            rnn_mode='dense',
+            greedy=greedy,
+            num_predictions=num_predictions,
             device=device
         )
 
-        plot_predictions(
-            full_context=context,
-            predicted_context=cp,
-            auto_reg_prediction=pred,
-            len_context=context_len,
-            title=f'{description}__Example_{i}',
-            fig_size=(10, 5),
-            line_width=1,
-            save_path=save_path,
-            show=show
-        )
+        if not greedy:
+            plot_multiple_predictions(
+                full_context=context,
+                predicted_context=cp,
+                auto_reg_prediction=pred,
+                len_context=context_len,
+                title=f'{description}__Example_{i}',
+                fig_size=(10, 5),
+                line_width=1,
+                save_path=save_path,
+                show=show
+            )
+        else:
+            plot_predictions(
+                full_context=context,
+                predicted_context=cp,
+                auto_reg_prediction=pred,
+                len_context=context_len,
+                title=f'{description}__Example_{i}',
+                fig_size=(10, 5),
+                line_width=1,
+                save_path=save_path,
+                show=show
+            )
         plt.close()
 
 
@@ -116,15 +135,21 @@ def eval_train_and_test(
         context_len: int,
         generation_len: int,
         num_train_examples: int,
+        num_predictions_per_example: int = 1,
         show: bool = True
 ):
+    # setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    # load module and hyperparameters from checkpoint
     pl_module, hparams, quantize, save_dir = setup_evaluation(path)
 
+    # extract train and test dataset
     train_dataset = pl_module.train_dataloader().dataset
     test_dataset = pl_module.test_dataloader().dataset
 
+    # adjust the sample length of the datasets. The total length has to be larger than
+    # context_len + generation_len + 1
     total_len = context_len + generation_len + 1
     print(f'Total length: {total_len}')
     context_split = float(context_len) / float(total_len)
@@ -143,6 +168,7 @@ def eval_train_and_test(
         device=device
     )'''
 
+    # evaluate training examples
     generate_with_context(
         pl_module=pl_module,
         data_loader=train_dataloader,
@@ -151,8 +177,12 @@ def eval_train_and_test(
         description='Train',
         context_split=context_split,
         quantize=quantize,
+        greedy=num_predictions_per_example == 1,
+        num_predictions=num_predictions_per_example,
         device=device
     )
+
+    # evaluate test examples
     generate_with_context(
         pl_module=pl_module,
         data_loader=test_dataloader,
@@ -161,6 +191,8 @@ def eval_train_and_test(
         description='Test',
         context_split=context_split,
         quantize=quantize,
+        greedy=num_predictions_per_example == 1,
+        num_predictions=num_predictions_per_example,
         device=device
     )
 
@@ -212,6 +244,7 @@ if __name__ == "__main__":
     parser.add_argument('--c_len', type=int, required=True, help='Context length.')
     parser.add_argument('--g_len', type=int, required=True, help='Generation length.')
     parser.add_argument('--num_ex', type=int, required=True, help='Number of training examples.')
+    parser.add_argument('--n_pred', type=int, default=1, help='Number of predictions per examples.')
     parser.add_argument('--show', type=bool, default=False, help='Show plots')
 
     # Parse the arguments
@@ -219,4 +252,4 @@ if __name__ == "__main__":
 
     # Call the main function with the parsed arguments
     print(args.show)
-    eval_train_and_test(args.path, args.c_len, args.g_len, args.num_ex, args.show)
+    eval_train_and_test(args.path, args.c_len, args.g_len, args.num_ex, args.n_pred, args.show)
