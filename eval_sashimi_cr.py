@@ -16,7 +16,10 @@ def setup_evaluation(path: str):
     # load checkpoint
     pl_module, hparams = load_checkpoint(path)
     # print hparams
+    print('*' * 32, '\n')
+    print('HPARAMS\n')
     print_hparams(hparams)
+    print('*' * 32, '\n')
 
     # check if quantization was used
     quantize = hparams['dataset']['quantize']
@@ -34,8 +37,11 @@ def setup_evaluation(path: str):
         print(f"Directory 'eval_plots' already exists at {save_dir}")
 
     # print model summary
+    print('*' * 32, '\n')
+    print('MODEL SUMMARY:\n')
     print_hparams(hparams['model'])
     print(get_model_summary(pl_module, max_depth=1))
+    print('*' * 32, '\n')
 
     return pl_module, hparams, quantize, save_dir
 
@@ -155,7 +161,7 @@ def eval_train_and_test(
     # adjust the sample length of the datasets. The total length has to be larger than
     # context_len + generation_len + 1
     total_len = context_len + generation_len + 1
-    print(f'Total length: {total_len}')
+    # print(f'Total length: {total_len}')
     context_split = float(context_len) / float(total_len)
 
     train_dataset.dataset.sample_len = total_len
