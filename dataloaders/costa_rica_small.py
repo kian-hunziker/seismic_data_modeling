@@ -55,6 +55,16 @@ class CostaRicaSmall(Dataset):
         # sort list by year and day
         year_day_list = sorted(year_day_list, key=lambda x: x[0] + x[1])
 
+        self.file_paths = [f for y, d, f in year_day_list]
+        self.num_train_examples = int(len(self.file_paths) * 0.95)
+
+        if self.train:
+            self.file_paths = self.file_paths[:self.num_train_examples]
+            year_day_list = year_day_list[:self.num_train_examples]
+        else:
+            self.file_paths = self.file_paths[self.num_train_examples:]
+            year_day_list = year_day_list[self.num_train_examples:]
+
         # construct tuples of consecutive recordings
         self.tuple_list = []
         for a, b in zip(year_day_list[:-1], year_day_list[1:]):
@@ -63,15 +73,6 @@ class CostaRicaSmall(Dataset):
             #else:
             #    self.tuple_list.append((a[-1], None))
             #    self.tuple_list.append((b[-1], None))
-
-        # sort file_paths
-        self.file_paths = [f for y, d, f in year_day_list]
-        self.num_train_examples = int(len(self.file_paths) * 0.95)
-
-        if self.train:
-            self.file_paths = self.file_paths[:self.num_train_examples]
-        else:
-            self.file_paths = self.file_paths[self.num_train_examples:]
 
         # mapping from label strings to file paths
         self.label_to_path = {}
