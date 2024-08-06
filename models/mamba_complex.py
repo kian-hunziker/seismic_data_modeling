@@ -31,24 +31,24 @@ except ImportError:
 
 class MambaComplex(nn.Module):
     def __init__(
-        self,
-        d_model,
-        d_state=16,
-        d_conv=4,
-        expand=2,
-        dt_rank="auto",
-        dt_min=0.001,
-        dt_max=0.1,
-        dt_init="random",
-        dt_scale=1.0,
-        dt_init_floor=1e-4,
-        conv_bias=True,
-        bias=False,
-        use_fast_path=True,  # Fused kernel options
-        layer_idx=None,
-        device=None,
-        dtype=None,
-        complex=False,
+            self,
+            d_model,
+            d_state=16,
+            d_conv=4,
+            expand=2,
+            dt_rank="auto",
+            dt_min=0.001,
+            dt_max=0.1,
+            dt_init="random",
+            dt_scale=1.0,
+            dt_init_floor=1e-4,
+            conv_bias=True,
+            bias=False,
+            use_fast_path=True,  # Fused kernel options
+            layer_idx=None,
+            device=None,
+            dtype=None,
+            complex=False,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -87,7 +87,7 @@ class MambaComplex(nn.Module):
         self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
-        dt_init_std = self.dt_rank**-0.5 * dt_scale
+        dt_init_std = self.dt_rank ** -0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(self.dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -132,9 +132,6 @@ class MambaComplex(nn.Module):
             ).contiguous()
             A_log = torch.log(A)  # Keep A_log in fp32
             self.A_log = nn.Parameter(A_log)
-        
-
-        
 
         # D "skip" parameter
         self.D = nn.Parameter(torch.ones(self.d_inner, device=device))  # Keep in fp32
@@ -173,7 +170,6 @@ class MambaComplex(nn.Module):
             # REAL:
             A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
 
-        
         # In the backward pass we write dx and dz next to each other to avoid torch.cat
         if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None:  # Doesn't support outputting the states
             out = mamba_inner_fn(
@@ -215,7 +211,7 @@ class MambaComplex(nn.Module):
             x_dbl = self.x_proj(rearrange(x, "b d l -> (b l) d"))  # (bl d)
 
             if self.complex:
-                dt, B, C = torch.split(x_dbl, [self.dt_rank, 2*self.d_state, 2*self.d_state], dim=-1)
+                dt, B, C = torch.split(x_dbl, [self.dt_rank, 2 * self.d_state, 2 * self.d_state], dim=-1)
                 B = rearrange(B, "(b l) (dstate two) -> b 1 dstate (l two)", l=seqlen, two=2).contiguous()
                 C = rearrange(C, "(b l) (dstate two) -> b 1 dstate (l two)", l=seqlen, two=2).contiguous()
             else:
@@ -224,7 +220,7 @@ class MambaComplex(nn.Module):
                 C = rearrange(C, "(b l) dstate -> b dstate l", l=seqlen).contiguous()
             dt = self.dt_proj.weight @ dt.t()
             dt = rearrange(dt, "d (b l) -> b d l", l=seqlen)
-            
+
             assert self.activation in ["silu", "swish"]
             y = selective_scan_fn(
                 x,
@@ -269,12 +265,14 @@ class MambaComplex(nn.Module):
             )
 
         x_db = self.x_proj(x)  # (B dt_rank+2*d_state)
+
         if self.complex:
-            dt, B_real, B_imag, C_real, C_imag = torch.split(x_db, [self.dt_rank, self.d_state, self.d_state, self.d_state, self.d_state], dim=-1)
-            B = B_real.float() + 1j * B_imag.float()
-            C = C_real.float() + 1j * C_imag.float()
+            dt, B, C = torch.split(x_db, [self.dt_rank, 2 * self.d_state, 2 * self.d_state], dim=-1)
+            B = torch.view_as_complex(rearrange(B.float(), "... (L two) -> ... L two", two=2))
+            C = torch.view_as_complex(rearrange(C.float(), "... (L two) -> ... L two", two=2))
         else:
             dt, B, C = torch.split(x_db, [self.dt_rank, self.d_state, self.d_state], dim=-1)
+
         # Don't add dt_bias here
         dt = F.linear(dt, self.dt_proj.weight)  # (B d_inner)
 
@@ -292,8 +290,19 @@ class MambaComplex(nn.Module):
             dA = torch.exp(torch.einsum("bd,dn->bdn", dt, A))
             dB = torch.einsum("bd,bn->bdn", dt, B)
             ssm_state.copy_(ssm_state * dA + rearrange(x, "b d -> b d 1") * dB)
-            y = torch.einsum("bdn,bn->bd", ssm_state.to(dtype), C)
+
+            if self.complex:
+                comp_type = torch.complex64
+            else:
+                comp_type = dtype
+
+            y = torch.einsum("bdn,bn->bd", ssm_state.to(comp_type), C)
+
+            if y.is_complex():
+                y = y.real * 2
+
             y = y + self.D.to(dtype) * x
+
             y = y * self.act(z)  # (B D)
         else:
             y = selective_state_update(
@@ -309,8 +318,13 @@ class MambaComplex(nn.Module):
         conv_state = torch.zeros(
             batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype
         )
-        ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
+        # ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
         # ssm_dtype = torch.float32
+        if self.complex:
+            ssm_dtype = torch.complex64
+        else:
+            ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
+
         ssm_state = torch.zeros(
             batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype
         )
@@ -332,7 +346,7 @@ class MambaComplex(nn.Module):
                 self.d_model * self.expand,
                 self.d_state,
                 device=self.dt_proj.weight.device,
-                dtype=self.dt_proj.weight.dtype,
+                dtype=torch.complex64 if self.complex else self.dt_proj.weight.dtype,
                 # dtype=torch.float32,
             )
             inference_params.key_value_memory_dict[self.layer_idx] = (conv_state, ssm_state)
@@ -343,3 +357,4 @@ class MambaComplex(nn.Module):
                 conv_state.zero_()
                 ssm_state.zero_()
         return conv_state, ssm_state
+
