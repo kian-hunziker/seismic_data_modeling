@@ -211,8 +211,14 @@ def create_trainer(config):
 
     loggers = [logger_t, logger_wab]
 
+    # monitor learning rate
+    lr_monitor = pl.callbacks.LearningRateMonitor(
+        logging_interval='step',
+        # log_momentum=True,
+    )
+
     # initialize trainer
-    trainer = pl.Trainer(logger=loggers, **config.trainer)
+    trainer = pl.Trainer(logger=loggers, callbacks=[lr_monitor], **config.trainer)
     return trainer
 
 
