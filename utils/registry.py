@@ -19,7 +19,8 @@ scheduler = {
 
 model = {
     "sashimi": "models.sashimi.sashimi_standalone.Sashimi",
-    "conv_net": "models.simple_test_models.ConvNet"
+    "conv_net": "models.simple_test_models.ConvNet",
+    "mamba-sashimi": "models.sashimi.sashimi_mamba.MambaSashimi"
 }
 
 dataset = {
