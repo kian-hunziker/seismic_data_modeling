@@ -117,7 +117,7 @@ def sash_generate_with_context(
 
         for i in range(num_predictions):
             prediction_output = []
-            y = context_output[-1]
+            y = context_output[-1].to(device)
             state = copy.deepcopy(conditioned_state)
 
             pbar = tqdm(total=seq_len)
