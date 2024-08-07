@@ -63,7 +63,7 @@ def load_checkpoint(checkpoint_path: str) -> tuple[LightningSequenceModel, dict]
 def get_pipeline_components(pl_module: LightningSequenceModel):
     """
     Extract encoder, decoder and model backbone from LightningSequenceModel.
-    The components are put in eval mode. If the model is a Sashimi, the RNN is set up.
+    The components are put in eval mode.
     :param pl_module: LightningSequenceModel (e.g. loaded from checkpoint)
     :return: Encoder, Decoder, Model
     """
@@ -71,8 +71,8 @@ def get_pipeline_components(pl_module: LightningSequenceModel):
     decoder = pl_module.decoder.eval()
     model = pl_module.model.eval()
 
-    if isinstance(model, Sashimi):
-        model.setup_rnn()
+    #if isinstance(model, Sashimi):
+        #model.setup_rnn()
 
     return encoder, decoder, model
 

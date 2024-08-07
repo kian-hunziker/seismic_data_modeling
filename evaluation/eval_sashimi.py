@@ -11,6 +11,36 @@ from evaluation.eval_utils import load_checkpoint, get_pipeline_components
 import matplotlib.pyplot as plt
 
 
+def moving_average(signal: torch.Tensor | np.ndarray, window_size: int = 10) -> torch.Tensor:
+    """
+    Calculate moving average over signal.
+    :param signal: Signal to average. [1, signal_length] or [signal_length]
+    :param window_size: Length of moving average. Defaults to 10
+    :return: Averaged signal with the same length as the input
+    """
+    if isinstance(signal, np.ndarray):
+        signal = torch.from_numpy(signal)
+
+    if signal.dim() == 1:
+        signal = signal.unsqueeze(0)
+    signal = signal.float()
+
+    # Create the convolution kernel with equal weights
+    kernel = torch.ones(window_size) / window_size
+
+    # Reshape the kernel to match the shape required for F.conv1d
+    kernel = kernel.view(1, 1, -1)
+
+    # Apply padding to the tensor to maintain the output size
+    padding = window_size // 2
+    padded_tensor = F.pad(signal, (padding, padding), mode='reflect')
+
+    # Apply the convolution
+    moving_avg = F.conv1d(padded_tensor.unsqueeze(0), kernel).squeeze(0)
+
+    return moving_avg
+
+
 def greedy_prediction(pred: torch.Tensor):
     """
     Greedy prediction. Argmax(pred)
@@ -81,7 +111,11 @@ def sash_generate_with_context(
     decoder = decoder.to(device)
 
     sashimi.eval()
-    sashimi.setup_rnn(mode=rnn_mode)
+    try:
+        sashimi.setup_rnn(mode=rnn_mode)
+    except:
+        print(f'Could not setup RNN with mode {rnn_mode}')
+        sashimi.setup_rnn()
     encoder.eval()
     decoder.eval()
 
@@ -137,7 +171,7 @@ def sash_generate_with_context(
             pbar.close()
 
     context_output = torch.stack(context_output, dim=1)
-    #prediction_output = torch.stack(prediction_output, dim=1)
+    # prediction_output = torch.stack(prediction_output, dim=1)
     return context_output.cpu(), all_predictions
 
 
