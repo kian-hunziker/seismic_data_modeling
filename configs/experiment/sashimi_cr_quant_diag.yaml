@@ -19,7 +19,6 @@ model:
   pool:
     - 16
     - 16
-    - 16
   dropout: 0.0
   mode: diag
   # prenorm: True
