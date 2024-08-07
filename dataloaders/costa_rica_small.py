@@ -3,6 +3,7 @@ import os.path
 import torch
 import glob
 import numpy as np
+from scipy.signal import decimate
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SequenceDataset
@@ -70,7 +71,7 @@ class CostaRicaSmall(Dataset):
         for a, b in zip(year_day_list[:-1], year_day_list[1:]):
             if a[0] == b[0] and int(a[1]) == int(b[1]) - 1:
                 self.tuple_list.append((a[-1], b[-1]))
-            #else:
+            # else:
             #    self.tuple_list.append((a[-1], None))
             #    self.tuple_list.append((b[-1], None))
 
@@ -80,14 +81,12 @@ class CostaRicaSmall(Dataset):
             label = format_label(file_path.split('/')[-1])
             self.label_to_path[label] = file_path
 
-
-
     def __len__(self):
         return len(self.tuple_list)
 
     def __getitem__(self, idx):
-        #file_path = self.file_paths[idx]
-        #data = torch.load(file_path)
+        # file_path = self.file_paths[idx]
+        # data = torch.load(file_path)
         f_1 = self.tuple_list[idx][0]
         f_2 = self.tuple_list[idx][1]
 
@@ -108,16 +107,18 @@ class CostaRicaSmall(Dataset):
         if not self.quantize:
             x = data[start_idx:stop_idx:self.downsample].type(torch.FloatTensor)
             y = data[start_idx + self.downsample: stop_idx + self.downsample: self.downsample].type(torch.FloatTensor)
-            return x.unsqueeze(1), y.unsqueeze(-1)
+            return x.unsqueeze(-1), y.unsqueeze(-1)
         else:
             # quantize the data
-            x_plus_one = data[start_idx:stop_idx + self.downsample:self.downsample].type(torch.FloatTensor)
+            x_plus_one = decimate(data[start_idx:stop_idx + self.downsample], q=self.downsample)
+            x_plus_one = torch.from_numpy(x_plus_one.copy()).float()
+            # x_plus_one = data[start_idx:stop_idx + self.downsample:self.downsample].type(torch.FloatTensor)
             x_plus_one = torch.sqrt(torch.abs(x_plus_one)) * torch.sign(x_plus_one)
             x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
             encoded = quantize_encode(x_plus_one, self.bits)
             x = encoded[:-1]
             y = encoded[1:]
-            return x.unsqueeze(1), y.unsqueeze(-1)
+            return x.unsqueeze(-1), y.unsqueeze(-1)
 
 
 class CostaRicaSmallLighting(SequenceDataset):
@@ -199,7 +200,7 @@ def run_tests():
 
     # plot 3 examples, x and y should be shifted by one position
     plot_first_examples(train_loader, plot_len=100)
-    plot_first_examples(test_loader, plot_len=sample_length)
+    plot_first_examples(test_loader, plot_len=sample_length, num_examples=len(test_loader.dataset))
 
     test_sanity_check = False
     for f in train_file_paths:
@@ -252,7 +253,7 @@ def run_tests():
             data_abs_max = x
     print(f'abs_max: {abs_max}')
     plt.plot(data_abs_max[0, :, 0])
-    plt.suptitle(f'frame with maximimum amplitude: {abs_max}')
+    plt.suptitle(f'frame with maximum amplitude: {abs_max}')
     plt.show()
 
 
