@@ -1196,8 +1196,14 @@ class SSMKernelDiag(SSMKernel):
         return state
 
     def step(self, u, state):
-        next_state = contract("h n, b h n -> b h n", self.dA, state) \
-                + contract("h n, b h -> b h n", self.dB, u)
+        # TODO: double check this
+        # original code below
+        #next_state = contract("h n, b h n -> b h n", self.dA, state) \
+        #        + contract("h n, b h -> b h n", self.dB, u)
+
+        # adapted to this as the sashimi evaluation threw an exception.
+        # changed the contraction based on dplr kernel diagonal mode
+        next_state = contract("h n, ... h n -> ... h n", self.dA, state) + contract("h n, b h -> b h n", self.dB, u)
         y = contract("c h n, b h n -> b c h", self.dC, next_state)
         return 2*y.real, next_state
 

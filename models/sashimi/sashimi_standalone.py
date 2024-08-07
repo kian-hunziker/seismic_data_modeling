@@ -428,7 +428,7 @@ class Sashimi(nn.Module):
         """
         assert mode in ['dense', 'diagonal', 'linear']
         for module in self.modules():
-            if hasattr(module, '_setup_step'): module._setup_step(mode=mode)
+            if hasattr(module, '_setup_step'): module._setup_step()#module._setup_step(mode=mode)
 
 
 if __name__ == '__main__':
