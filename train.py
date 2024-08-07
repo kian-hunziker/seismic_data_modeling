@@ -1,4 +1,5 @@
 import datetime
+import os
 import hydra
 import omegaconf
 import pytorch_lightning as pl
@@ -52,7 +53,7 @@ class LightningSequenceModel(pl.LightningModule):
         )'''
         self.decoder = instantiate_decoder(self.hparams.decoder, self.dataset, self.model)
 
-        #if self.hparams.model._name_ == "conv_net":
+        # if self.hparams.model._name_ == "conv_net":
         #    self.model = ConvNet(self.hparams.model.in_channels, self.hparams.model.img_size)
 
         self.task = instantiate(task_registry, self.hparams.task, dataset=self.dataset, model=self.model)
@@ -111,25 +112,25 @@ class LightningSequenceModel(pl.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         self._on_epoch_start()
-        
+
     def on_train_epoch_end(self) -> None:
         super().on_train_epoch_end()
-        
+
     def on_validation_epoch_start(self) -> None:
         self._on_epoch_start()
-    
+
     def on_validation_epoch_end(self) -> None:
         super().on_validation_epoch_end()
 
     def on_test_epoch_start(self) -> None:
         self._on_epoch_start()
-        
+
     def on_test_epoch_end(self) -> None:
         super().on_test_epoch_end()
 
     def training_step(self, batch, batch_idx):
         loss = self._step_with_metrics(batch, batch_idx, prefix='train')
-        
+
         # logging
         loss_epoch = {'trainer/loss': loss, 'trainer/epoch': self.current_epoch}
         self.log_dict(
@@ -222,6 +223,31 @@ def create_trainer(config):
     return trainer
 
 
+def plot_and_save_training_examples(model: LightningSequenceModel, trainer: pl.Trainer, num_examples: int = 3):
+    print('\n', 'Plotting and saving training examples', '\n')
+    log_dir = trainer.logger.log_dir
+
+    # create directory for plots
+    save_dir = os.path.join(log_dir, 'training_examples')
+
+    # Check if the 'plots' directory exists
+    if not os.path.exists(save_dir):
+        # If it does not exist, create it
+        os.makedirs(save_dir)
+        print(f"Directory 'training_examples' created at {save_dir}")
+    else:
+        print(f"Directory 'training_examples' already exists at {save_dir}")
+
+    x, _ = next(iter(model.dataset.train_dataloader(batch_size=num_examples)))
+
+    for i in range(num_examples):
+        fig, ax = plt.subplots(figsize=(40, 10))
+        ax.plot(x[i].squeeze().cpu().numpy())
+        plt.suptitle(f'Training example {i}')
+        plt.savefig(os.path.join(save_dir, f'training_example_{i}.png'))
+        plt.close()
+
+
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def main(config: OmegaConf) -> None:
     print('*' * 32)
@@ -229,8 +255,12 @@ def main(config: OmegaConf) -> None:
     print(OmegaConf.to_yaml(config))
     print('*' * 32, '\n\n')
 
+    print(f'cuda available: {torch.cuda.is_available()}')
+
     trainer = create_trainer(config)
     model = LightningSequenceModel(config)
+
+    plot_and_save_training_examples(model, trainer, num_examples=16)
 
     summary = ModelSummary(model, max_depth=1)
     print('\n', '*' * 32, '\n')
