@@ -244,6 +244,7 @@ def plot_and_save_training_examples(model: LightningSequenceModel, trainer: pl.T
         fig, ax = plt.subplots(figsize=(40, 10))
         ax.plot(x[i].squeeze().cpu().numpy())
         plt.suptitle(f'Training example {i}')
+        plt.tight_layout()
         plt.savefig(os.path.join(save_dir, f'training_example_{i}.png'))
         plt.close()
 
