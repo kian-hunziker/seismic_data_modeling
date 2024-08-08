@@ -3,9 +3,11 @@ import yaml
 import torch
 import re
 import os
+import glob
 import numpy as np
 from pytorch_lightning.utilities.model_summary import ModelSummary
 from train import LightningSequenceModel
+from dataloaders.data_utils.costa_rica_utils import get_metadata
 from models.sashimi.sashimi_standalone import Sashimi
 
 
@@ -84,3 +86,18 @@ def print_hparams(hparams: dict):
 def get_model_summary(model: LightningSequenceModel, max_depth=1):
     summary = ModelSummary(model, max_depth=max_depth)
     return summary
+
+
+def get_sorted_file_list(dir_path: str):
+    file_paths = glob.glob(os.path.join(dir_path, '*.pt'))
+    year_day_list = []
+    for file in file_paths:
+        name = file.split('/')[-1]
+        meta = get_metadata(name)
+        year_day_list.append((meta['year'], meta['day'], file))
+
+    # sort list by year and day
+    year_day_list = sorted(year_day_list, key=lambda x: x[0] + x[1])
+
+    file_paths = [f for y, d, f in year_day_list]
+    return file_paths
