@@ -152,7 +152,11 @@ class MambaSashimi(nn.Module):
         self.complex = complex
 
         def mamba_block(dim, layer_idx):
-            mixer_cls = partial(MambaComplex, d_state=64, d_conv=4, expand=2, layer_idx=layer_idx, complex=self.complex)
+            # make sure, the dt_rank is divisible by 2 which is required to make complex step funciton work
+            dt_rank = math.ceil(self.d_model / 16)
+            if dt_rank % 2 != 0:
+                dt_rank += 1
+            mixer_cls = partial(MambaComplex, d_state=64, d_conv=4, expand=2, layer_idx=layer_idx, complex=self.complex, dt_rank=dt_rank)
             norm_cls = partial(RMSNorm, eps=1e-5)
             mlp_cls = nn.Identity
             block = Block(
