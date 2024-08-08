@@ -40,9 +40,9 @@ loader:
   batch_size: 32
 
 scheduler:
-  num_warmup_steps: 5000
-  num_training_steps: 20000
+  num_warmup_steps: 10000
+  num_training_steps: 100000
 
 trainer:
-  max_epochs: 1000
+  max_epochs: 355
   gradient_clip_val: 1.0
