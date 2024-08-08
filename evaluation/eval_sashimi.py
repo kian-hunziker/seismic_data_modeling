@@ -4,6 +4,8 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from scipy.signal import decimate
+from dataloaders.data_utils.signal_encoding import quantize_encode, normalize_11_torch
 import numpy as np
 from tqdm import tqdm
 from models.sashimi.sashimi_standalone import Sashimi
@@ -41,6 +43,18 @@ def moving_average(signal: torch.Tensor | np.ndarray, window_size: int = 10) -> 
     return moving_avg
 
 
+def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8):
+    data_min = -np.sqrt(783285)
+    data_max = np.sqrt(783285)
+
+    data = decimate(data, q=downsample)
+    data = torch.from_numpy(data.copy()).float()
+    data = torch.sqrt(torch.abs(data)) * torch.sign(data)
+    data = normalize_11_torch(data, d_min=data_min, d_max=data_max)
+    data = quantize_encode(data, bits=bits)
+    return data
+
+
 def greedy_prediction(pred: torch.Tensor):
     """
     Greedy prediction. Argmax(pred)
@@ -61,6 +75,14 @@ def multinomial_prediction(pred: torch.Tensor, temperature: float = 1.0):
     return torch.multinomial(F.softmax(pred, dim=1), 1)
 
 
+def top_k_prediction(pred: torch.Tensor, k: int, temperature: float = 1.0):
+    pred = pred / temperature
+    pred = F.softmax(pred, dim=-1)
+    top_k_prob, top_k_idx = torch.topk(pred, k)
+    sample = torch.multinomial(top_k_prob, num_samples=1)
+    return top_k_idx[:, int(sample)].unsqueeze(0)
+
+
 def sash_generate_with_context(
         encoder: nn.Module,
         decoder: nn.Module,
@@ -69,8 +91,10 @@ def sash_generate_with_context(
         seq_len: int,
         quantized: bool = False,
         rnn_mode: str = 'diagonal',
+        sampling_strategy: str = 'greedy',
         greedy: bool = True,
         num_predictions: int = 1,
+        k: int = 10,
         temperature: float = 1.0,
         device: str | torch.device = 'cpu'
 ) -> tuple[torch.Tensor, list[torch.Tensor]]:
@@ -161,10 +185,14 @@ def sash_generate_with_context(
                 y, state = sashimi.step(y, state)
                 y = decoder(y, state)
                 if quantized:
-                    if greedy or i == 0:
+                    if sampling_strategy == 'greedy' or i == 0:
                         y = greedy_prediction(y)
-                    else:
+                    elif sampling_strategy == 'prop':
                         y = multinomial_prediction(y, temperature=temperature)
+                    elif sampling_strategy == 'top_k':
+                        y = top_k_prediction(y, k=k, temperature=temperature)
+                    else:
+                        print(f'Unknown sampling strategy {sampling_strategy}')
                 prediction_output.append(y.detach().cpu())
                 pbar.update()
             all_predictions.append(torch.stack(prediction_output, dim=1).cpu())
@@ -173,6 +201,66 @@ def sash_generate_with_context(
     context_output = torch.stack(context_output, dim=1)
     # prediction_output = torch.stack(prediction_output, dim=1)
     return context_output.cpu(), all_predictions
+
+
+def sash_condition(
+        encoder: nn.Module,
+        decoder: nn.Module,
+        sashimi: Sashimi,
+        context: torch.Tensor | np.ndarray | list,
+        quantized: bool = False,
+        rnn_mode: str = 'diagonal',
+        device: str | torch.device = 'cpu'
+):
+    assert isinstance(sashimi, Sashimi)
+
+    if isinstance(context, np.ndarray):
+        context = torch.from_numpy(context).type(torch.float32)
+    elif isinstance(context, list):
+        context = torch.Tensor(context).type(torch.float32)
+    elif isinstance(context, torch.Tensor):
+        context = context.type(torch.float32)
+
+    if context.dim() == 1:
+        context = context.unsqueeze(0).unsqueeze(-1)
+
+    sashimi = sashimi.to(device)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
+    sashimi.eval()
+    try:
+        sashimi.setup_rnn(mode=rnn_mode)
+    except:
+        print(f'Could not setup RNN with mode {rnn_mode}')
+        sashimi.setup_rnn()
+    encoder.eval()
+    decoder.eval()
+
+    context = context.to(device)
+    if quantized:
+        context = context.long()
+
+    state = sashimi.default_state(device=device)
+    context_len = context.shape[1]
+    context_output = []
+
+    # inference in recurrent mode
+    with torch.no_grad():
+        # 'condition' the model by passing the context
+        # teacher forcing approach, the output is saved for plotting but not fed back to model.
+        pbar = tqdm(total=context_len)
+        pbar.set_description('Processing context')
+        for i in range(context_len):
+            y = encoder(context[:, i])
+            y, state = sashimi.step(y, state)
+            y = decoder(y, state)
+            if quantized:
+                y = torch.argmax(y, dim=-1).unsqueeze(0)
+            context_output.append(y.detach().cpu())
+            pbar.update()
+        pbar.close()
+    return torch.stack(context_output, dim=1).cpu(), state
 
 
 def sash_generate_without_context(
@@ -393,5 +481,13 @@ def sashimi_eval_test():
     print('done!')
 
 
+def top_k_test():
+    pred = torch.tensor([100, -2.5, 3, 11.5, 99, 0.1])
+    for i in range(10):
+        out = top_k_prediction(pred, k=3)
+        print(out)
+
+
 if __name__ == '__main__':
-    sashimi_eval_test()
+    # sashimi_eval_test()
+    top_k_test()
