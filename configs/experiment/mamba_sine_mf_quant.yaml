@@ -7,7 +7,7 @@ defaults:
   - /task: classification
   - /optimizer: adamw_mamba
   - /scheduler: cosine_warmup
-  - /model: mamba-sashimi
+  - /model: mamba_sashimi
 
 experiment_name: mamba_sine_mf_quant
 
@@ -40,7 +40,8 @@ loader:
   batch_size: 32
 
 scheduler:
-  patience: 20
+  num_warmup_steps: 5000
+  num_training_steps: 20000
 
 trainer:
   max_epochs: 1000

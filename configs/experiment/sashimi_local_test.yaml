@@ -46,7 +46,8 @@ trainer:
   log_every_n_steps: 1
 
 dataset:
-  sample_len: 8000
+  sample_len: 65536
+  downsample: 200
   quantize: True
 
 task:

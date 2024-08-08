@@ -1,0 +1,11 @@
+_name_: mamba-sashimi
+d_model: 64
+n_layers: 3
+expand: 2
+ff: 2
+pool:
+  - 16
+  - 16
+dropout: 0.0
+unet: False
+complex: False
