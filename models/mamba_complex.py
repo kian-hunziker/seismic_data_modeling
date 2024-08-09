@@ -113,12 +113,12 @@ class MambaComplex(nn.Module):
                 torch.ones(self.d_state, dtype=torch.float32, device=device) * 0.5,
                 "n -> d n",
                 d=self.d_inner
-            )
+            ).contiguous()
             A_imag = repeat(
                 torch.arange(0, self.d_state, dtype=torch.float32, device=device),
                 "n -> d n",
                 d=self.d_inner
-            )
+            ).contiguous()
             A_log_real = torch.log(A_real)
             self.A_log_real = nn.Parameter(A_log_real)
             self.A_log_real._no_weight_decay = True
