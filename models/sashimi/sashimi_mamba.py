@@ -29,6 +29,7 @@ except ImportError:
 from einops import rearrange
 from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
 
+
 class DownPool(nn.Module):
     def __init__(self, d_input, expand, pool):
         super().__init__()
@@ -81,7 +82,7 @@ class UpPool(nn.Module):
     def forward(self, x, skip=None):
         x = self.linear(x)
 
-        x = F.pad(x[..., :-1], (1, 0)) # Shift to ensure causality
+        x = F.pad(x[..., :-1], (1, 0))  # Shift to ensure causality
         x = rearrange(x, '... (h s) l -> ... h (l s)', s=self.pool)
 
         if skip is not None:
@@ -101,27 +102,29 @@ class UpPool(nn.Module):
             x = x.squeeze(-1)
             x = rearrange(x, '... (h s) -> ... h s', s=self.pool)
             state = list(torch.unbind(x, dim=-1))
-        else: assert x is None
+        else:
+            assert x is None
         return y, state
 
     def default_state(self, *batch_shape, device=None):
-        state = torch.zeros(batch_shape + (self.d_output, self.pool), device=device) # (batch, h, s)
-        state = list(torch.unbind(state, dim=-1)) # List of (..., H)
+        state = torch.zeros(batch_shape + (self.d_output, self.pool), device=device)  # (batch, h, s)
+        state = list(torch.unbind(state, dim=-1))  # List of (..., H)
         return state
+
 
 class MambaSashimi(nn.Module):
     def __init__(
-        self,
-        d_model=64,
-        n_layers=8,
-        pool=[4, 4],
-        expand=2,
-        ff=2,
-        bidirectional=False,
-        unet=False,
-        dropout=0.0,
-        complex=False,
-        **s4_args,
+            self,
+            d_model=64,
+            n_layers=8,
+            pool=[4, 4],
+            expand=2,
+            ff=2,
+            bidirectional=False,
+            unet=False,
+            dropout=0.0,
+            complex=False,
+            **s4_args,
     ):
         """
         SaShiMi model backbone.
@@ -156,7 +159,8 @@ class MambaSashimi(nn.Module):
             dt_rank = math.ceil(dim / 16)
             if self.complex and dt_rank % 2 != 0:
                 dt_rank += 1
-            mixer_cls = partial(MambaComplex, d_state=64, d_conv=4, expand=2, layer_idx=layer_idx, complex=self.complex, dt_rank=dt_rank)
+            mixer_cls = partial(MambaComplex, d_state=64, d_conv=4, expand=2, layer_idx=layer_idx, complex=self.complex,
+                                dt_rank=dt_rank)
             norm_cls = partial(RMSNorm, eps=1e-5)
             mlp_cls = nn.Identity
             block = Block(
@@ -181,7 +185,7 @@ class MambaSashimi(nn.Module):
                 for _ in range(n_layers):
                     d_layers.append(mamba_block(H, layer_idx))
                     layer_idx += 1
-                    #if ff > 0: d_layers.append(ff_block(H))
+                    # if ff > 0: d_layers.append(ff_block(H))
 
             # Add sequence downsampling and feature expanding
             d_layers.append(DownPool(H, expand, p))
@@ -192,7 +196,7 @@ class MambaSashimi(nn.Module):
         for _ in range(n_layers):
             c_layers.append(mamba_block(H, layer_idx))
             layer_idx += 1
-            #if ff > 0: c_layers.append(ff_block(H))
+            # if ff > 0: c_layers.append(ff_block(H))
 
         # Up blocks
         u_layers = []
@@ -204,7 +208,7 @@ class MambaSashimi(nn.Module):
             for _ in range(n_layers):
                 block.append(mamba_block(H, layer_idx))
                 layer_idx += 1
-                #if ff > 0: block.append(ff_block(H))
+                # if ff > 0: block.append(ff_block(H))
 
             u_layers.append(nn.ModuleList(block))
 
@@ -242,16 +246,15 @@ class MambaSashimi(nn.Module):
         residual = None
         for layer in self.c_layers:
             x, residual = layer(x, residual, inference_params)
-        
 
         x = x.transpose(1, 2)
-        x = x + outputs.pop() # add a skip connection to the last output of the down block
+        x = x + outputs.pop()  # add a skip connection to the last output of the down block
 
         # Up blocks
         for block in self.u_layers:
             if self.unet:
                 # TODO: add unet support
-                #for layer in block:
+                # for layer in block:
                 #    x, _ = layer(x)
                 #    x = x + outputs.pop() # skip connection
                 residual = None
@@ -259,7 +262,7 @@ class MambaSashimi(nn.Module):
                     if isinstance(layer, UpPool):
                         x, _ = layer(x)
                         x = x + outputs.pop()
-                        
+
                     if isinstance(layer, Block):
                         x = x.transpose(1, 2)
                         x, residual = layer(x, residual, inference_params)
@@ -278,13 +281,13 @@ class MambaSashimi(nn.Module):
                         x, residual = layer(x, residual, inference_params)
 
                 x = x.transpose(1, 2)
-                x = x + outputs.pop() # add a skip connection from the input of the modeling part of this up block
+                x = x + outputs.pop()  # add a skip connection from the input of the modeling part of this up block
 
         # feature projection
-        x = x.transpose(1, 2) # (batch, length, expand)
+        x = x.transpose(1, 2)  # (batch, length, expand)
         x = self.norm(x)
 
-        return x, None # required to return a state
+        return x, None  # required to return a state
 
     def default_state(self, *args, **kwargs):
         layers = list(self.d_layers) + list(self.c_layers) + [layer for block in self.u_layers for layer in block]
@@ -295,7 +298,7 @@ class MambaSashimi(nn.Module):
             else:
                 states.append(layer.default_state(*args, **kwargs))
         return states
-        #return [layer.default_state(*args, **kwargs) for layer in layers if not isinstance(layer, Block)]
+        # return [layer.default_state(*args, **kwargs) for layer in layers if not isinstance(layer, Block)]
 
     def allocate_inference_cache(self, batch_size, max_seqlen):
         layers = list(self.d_layers) + list(self.c_layers) + [layer for block in self.u_layers for layer in block]
@@ -310,7 +313,7 @@ class MambaSashimi(nn.Module):
         state = state[::-1]
 
         # Down blocks
-        outputs = [] # Store all layers for SaShiMi
+        outputs = []  # Store all layers for SaShiMi
         next_state = []
         residual = None
         for layer in self.d_layers:
@@ -320,15 +323,15 @@ class MambaSashimi(nn.Module):
                 next_state.append(_next_state)
                 residual = None
             if isinstance(layer, Block):
-                outputs.append(x)    
+                outputs.append(x)
                 x = x.unsqueeze(0)
                 state.pop()
                 x, residual = layer(x, residual, inference_params)
                 next_state.append([])
                 x = x.squeeze(0)
-            #outputs.append(x)
-            #x, _next_state = layer.step(x, state=state.pop(), **kwargs)
-            #next_state.append(_next_state)
+            # outputs.append(x)
+            # x, _next_state = layer.step(x, state=state.pop(), **kwargs)
+            # next_state.append(_next_state)
             if x is None: break
 
         # Center block
@@ -341,7 +344,7 @@ class MambaSashimi(nn.Module):
                 # TODO: add unet support
                 for i in range(skipped):
                     next_state.append(state.pop())
-                u_layers = list(self.u_layers)[skipped//3:]
+                u_layers = list(self.u_layers)[skipped // 3:]
             else:
                 for i in range(skipped):
                     for _ in range(len(self.u_layers[i])):
@@ -385,7 +388,7 @@ class MambaSashimi(nn.Module):
                         state.pop()
                         x, residual = layer(x, residual, inference_params)
                         next_state.append([])
-                    
+
                     if isinstance(layer, UpPool):
                         x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                         next_state.append(_next_state)
@@ -397,4 +400,3 @@ class MambaSashimi(nn.Module):
         # feature projection
         x = self.norm(x)
         return x, next_state
-                

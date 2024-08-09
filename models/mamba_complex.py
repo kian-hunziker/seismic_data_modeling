@@ -357,4 +357,3 @@ class MambaComplex(nn.Module):
                 conv_state.zero_()
                 ssm_state.zero_()
         return conv_state, ssm_state
-
