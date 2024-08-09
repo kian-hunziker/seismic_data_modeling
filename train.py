@@ -222,16 +222,23 @@ def create_trainer(config):
         logging_interval='step',
         # log_momentum=True,
     )
-    '''checkpoint_callback = ModelCheckpoint(
+    top_checkpoints = ModelCheckpoint(
         save_top_k=3,
         monitor="val/loss",
         mode="min",
         dirpath=f'wandb_logs/MA/{current_date}/checkpoints',
         filename="callback-{epoch:d}-{step:d}",
-    )'''
+    )
+
+    last_checkpoints = ModelCheckpoint(
+        save_top_k=2,
+        monitor="epoch",
+        mode="max",
+        dirpath=f'wandb_logs/MA/{current_date}/checkpoints',
+    )
 
     # initialize trainer
-    trainer = pl.Trainer(logger=loggers, callbacks=[lr_monitor], **config.trainer)
+    trainer = pl.Trainer(logger=loggers, callbacks=[lr_monitor, top_checkpoints, last_checkpoints], **config.trainer)
     return trainer
 
 
