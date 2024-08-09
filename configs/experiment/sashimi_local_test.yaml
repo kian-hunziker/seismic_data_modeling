@@ -3,7 +3,7 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: cr_small
+  - /dataset: sine/small_single_freq_quant
   - /task: classification
   - /optimizer: adamw
   - /scheduler: cosine_warmup
@@ -25,6 +25,7 @@ model:
   #   n_ssm: 1
 
 train:
+  ckpt_path: wandb_logs/MA/2024-08-09__17_03_42
   monitor: val/loss
   mode: min
 
@@ -38,18 +39,12 @@ loader:
   batch_size: 5
 
 scheduler:
-  num_warmup_steps: 10
-  num_training_steps: 50
+  num_warmup_steps: 160
+  num_training_steps: 500
 
 trainer:
-  max_epochs: 10
+  max_epochs: 60
   log_every_n_steps: 1
 
 dataset:
-  sample_len: 65536
-  downsample: 200
-  quantize: True
-
-task:
-  loss: cross-entropy-context
-  context_len: 1000
+  overwrite_existing_file: False

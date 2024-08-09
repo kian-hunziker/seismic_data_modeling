@@ -18,7 +18,7 @@ def _extract_step_number(filename):
     return None
 
 
-def load_checkpoint(checkpoint_path: str, location: str = 'cpu') -> tuple[LightningSequenceModel, dict]:
+def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False) -> tuple[LightningSequenceModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
     If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
@@ -58,8 +58,10 @@ def load_checkpoint(checkpoint_path: str, location: str = 'cpu') -> tuple[Lightn
         print(f'Experiment name: {name}')
 
     model = LightningSequenceModel.load_from_checkpoint(checkpoint_path, map_location=location)
-
-    return model, hparams
+    if return_path:
+        return model, hparams, checkpoint_path
+    else:
+        return model, hparams
 
 
 def get_pipeline_components(pl_module: LightningSequenceModel):

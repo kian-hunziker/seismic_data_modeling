@@ -2,7 +2,10 @@ import datetime
 import os
 import hydra
 import omegaconf
+import re
+import yaml
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary, LayerSummary
 import torch
@@ -195,6 +198,8 @@ def create_trainer(config):
     experiment_name = config.experiment_name
 
     # setup logger
+    if config.train.get("ckpt_path", None) is not None:
+        current_date = config.train.get("ckpt_path").split('/')[-1]
 
     logger_t = TensorBoardLogger(
         save_dir='wandb_logs',
@@ -217,6 +222,13 @@ def create_trainer(config):
         logging_interval='step',
         # log_momentum=True,
     )
+    '''checkpoint_callback = ModelCheckpoint(
+        save_top_k=3,
+        monitor="val/loss",
+        mode="min",
+        dirpath=f'wandb_logs/MA/{current_date}/checkpoints',
+        filename="callback-{epoch:d}-{step:d}",
+    )'''
 
     # initialize trainer
     trainer = pl.Trainer(logger=loggers, callbacks=[lr_monitor], **config.trainer)
@@ -249,6 +261,60 @@ def plot_and_save_training_examples(model: LightningSequenceModel, trainer: pl.T
         plt.close()
 
 
+def _extract_step_number(filename):
+    match = re.search(r'step=(\d+)\.ckpt$', filename)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False) -> tuple[
+    LightningSequenceModel, dict]:
+    """
+    Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
+    If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
+    step number is returned.
+    :param checkpoint_path: path to checkpoint file. The hparams file is extracted automatically
+    :return: LightningSequenceModel, hparams
+    """
+    if not checkpoint_path.endswith('.ckpt'):
+        # the path does not directly lead to checkpoint, we search for checkpoints in directory
+        all_files = []
+
+        # Walk through directory and subdirectories
+        for root, dirs, files in os.walk(checkpoint_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                step_number = _extract_step_number(file)
+                if step_number is not None:
+                    all_files.append((step_number, file_path))
+        all_files.sort(key=lambda x: x[0])
+        checkpoint_path = all_files[-1][1]
+
+    hparam_path = '/'.join(checkpoint_path.split('/')[:-2]) + '/hparams.yaml'
+
+    if not os.path.isfile(checkpoint_path):
+        print('NO CHECKPOINT FOUND')
+        return None
+    if not os.path.isfile(hparam_path):
+        print('NO HPARAM FOUND')
+        hparams = None
+    else:
+        with open(hparam_path, 'r') as f:
+            hparams = yaml.safe_load(f)
+
+    print(f'Loading checkpoint from {checkpoint_path}')
+    if hparams is not None:
+        name = hparams['experiment_name']
+        print(f'Experiment name: {name}')
+
+    model = LightningSequenceModel.load_from_checkpoint(checkpoint_path, map_location=location)
+    if return_path:
+        return model, hparams, checkpoint_path
+    else:
+        return model, hparams
+
+
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def main(config: OmegaConf) -> None:
     print('*' * 32)
@@ -258,8 +324,13 @@ def main(config: OmegaConf) -> None:
 
     print(f'cuda available: {torch.cuda.is_available()}')
 
-    trainer = create_trainer(config)
-    model = LightningSequenceModel(config)
+    if config.train.get("ckpt_path", None) is not None:
+        print(f'loading checkpoint from {config.train.ckpt_path}')
+        model, hparams, ckpt_path = load_checkpoint(config.train.ckpt_path, return_path=True)
+        trainer = create_trainer(config)
+    else:
+        trainer = create_trainer(config)
+        model = LightningSequenceModel(config)
 
     plot_and_save_training_examples(model, trainer, num_examples=16)
 
@@ -277,7 +348,10 @@ def main(config: OmegaConf) -> None:
     print(model.decoder)
     print('*' * 32, '\n\n')
 
-    trainer.fit(model)
+    if config.train.get("ckpt_path", None) is not None:
+        trainer.fit(model, ckpt_path=ckpt_path)
+    else:
+        trainer.fit(model)
 
     print('\n', '*' * 32, '\n')
     print('DONE')
