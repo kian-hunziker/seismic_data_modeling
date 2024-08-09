@@ -153,8 +153,8 @@ class MambaSashimi(nn.Module):
 
         def mamba_block(dim, layer_idx):
             # make sure, the dt_rank is divisible by 2 which is required to make complex step funciton work
-            dt_rank = math.ceil(self.d_model / 16)
-            if dt_rank % 2 != 0:
+            dt_rank = math.ceil(dim / 16)
+            if self.complex and dt_rank % 2 != 0:
                 dt_rank += 1
             mixer_cls = partial(MambaComplex, d_state=64, d_conv=4, expand=2, layer_idx=layer_idx, complex=self.complex, dt_rank=dt_rank)
             norm_cls = partial(RMSNorm, eps=1e-5)
@@ -230,8 +230,8 @@ class MambaSashimi(nn.Module):
             outputs.append(x)
 
         # Center block
-        residual = None
         x = x.transpose(1, 2)
+        residual = None
         for layer in self.c_layers:
             x, residual = layer(x, residual, inference_params)
         
@@ -242,13 +242,13 @@ class MambaSashimi(nn.Module):
         # Up blocks
         for block in self.u_layers:
             if self.unet:
+                # TODO: add unet support
                 for layer in block:
                     x, _ = layer(x)
                     x = x + outputs.pop() # skip connection
             else:
+                residual = None
                 for layer in block:
-                    residual = None
-                    
                     if isinstance(layer, UpPool):
                         x, _ = layer(x)
                         # Before modeling layer in the block
@@ -306,6 +306,7 @@ class MambaSashimi(nn.Module):
             for _ in range(skipped + len(self.c_layers)):
                 next_state.append(state.pop())
             if self.unet:
+                # TODO: add unet support
                 for i in range(skipped):
                     next_state.append(state.pop())
                 u_layers = list(self.u_layers)[skipped//3:]
@@ -329,6 +330,7 @@ class MambaSashimi(nn.Module):
 
         for block in u_layers:
             if self.unet:
+                # TODO: add unet support
                 for layer in block:
                     x, residual = layer.step(x, state=state.pop(), **kwargs)
                     next_state.append(_next_state)
@@ -346,7 +348,6 @@ class MambaSashimi(nn.Module):
                     if isinstance(layer, UpPool):
                         x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                         next_state.append(_next_state)
-                        # Before modeling layer in the block
                         x = x + outputs.pop()
                         outputs.append(x)
                 x = x.squeeze(0)
