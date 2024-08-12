@@ -1,5 +1,4 @@
 import os
-import yaml
 import copy
 import torch
 import torch.nn as nn
@@ -8,6 +7,8 @@ from scipy.signal import decimate
 from dataloaders.data_utils.signal_encoding import quantize_encode, normalize_11_torch
 import numpy as np
 from tqdm import tqdm
+
+from evaluation.multiclass_sampling import greedy_prediction, multinomial_prediction, top_k_prediction
 from models.sashimi.sashimi_standalone import Sashimi
 from evaluation.eval_utils import load_checkpoint, get_pipeline_components
 import matplotlib.pyplot as plt
@@ -53,34 +54,6 @@ def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8):
     data = normalize_11_torch(data, d_min=data_min, d_max=data_max)
     data = quantize_encode(data, bits=bits)
     return data
-
-
-def greedy_prediction(pred: torch.Tensor):
-    """
-    Greedy prediction. Argmax(pred)
-    :param pred: predictions [1, num_classes]
-    :return: greedy prediction [1, 1]
-    """
-    return torch.argmax(pred, dim=-1).unsqueeze(0)
-
-
-def multinomial_prediction(pred: torch.Tensor, temperature: float = 1.0):
-    """
-    Sample from predictions using softmax and multinomial distribution.
-    :param pred: predictions [1, num_classes]
-    :param temperature: temperature for softmax. Default: 1.0
-    :return: sampled prediction [1, 1]
-    """
-    pred = pred / temperature
-    return torch.multinomial(F.softmax(pred, dim=1), 1)
-
-
-def top_k_prediction(pred: torch.Tensor, k: int, temperature: float = 1.0):
-    pred = pred / temperature
-    pred = F.softmax(pred, dim=-1)
-    top_k_prob, top_k_idx = torch.topk(pred, k)
-    sample = torch.multinomial(top_k_prob, num_samples=1)
-    return top_k_idx[:, int(sample)].unsqueeze(0)
 
 
 def sash_generate_with_context(
