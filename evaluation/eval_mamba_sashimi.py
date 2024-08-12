@@ -13,7 +13,7 @@ supported_sampling_modes = ['greedy', 'prob', 'top_k']
 
 def free_generation_from_default_state(sash, encoder, decoder, length=1024, num_predictions: int = 10,
                                        temperature: float = 1.0):
-    inference_params = InferenceParams(max_seqlen=length + 10, max_batch_size=1)
+    initial_inference_params = InferenceParams(max_seqlen=length + 10, max_batch_size=1)
     default_state = sash.default_state(device='cuda')
 
     all_predictions = []
@@ -21,6 +21,7 @@ def free_generation_from_default_state(sash, encoder, decoder, length=1024, num_
     for i in range(num_predictions):
         print(f'sample {i + 1} / {num_predictions}')
         state = copy.deepcopy(default_state)
+        inference_params = copy.deepcopy(initial_inference_params)
         y = torch.zeros(1, 1).long().to("cuda")
         ys = []
         with torch.no_grad():
