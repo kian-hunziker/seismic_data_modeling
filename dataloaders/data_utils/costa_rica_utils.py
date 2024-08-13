@@ -11,7 +11,7 @@ STATIONS = ['COVE', 'HDC3', 'RIFO']
 
 def get_metadata(f_name: str) -> dict:
     full_path = copy.deepcopy(f_name)
-    f_name = f_name.replace('..', '.')
+    f_name = f_name.split('/')[-1].replace('..', '.')
 
     meta = f_name.split('.')
     station = meta[1]
@@ -156,5 +156,8 @@ def find_data_min_and_max(filename: str) -> tuple:
 
 if __name__ == '__main__':
     path = '../data/costa_rica/small_subset'
-    d_min, d_max = find_data_min_and_max(path)
-    print(f'd_min: {d_min}, d_max: {d_max}')
+    #d_min, d_max = find_data_min_and_max(path)
+    #print(f'd_min: {d_min}, d_max: {d_max}')
+    data_min, data_max = find_data_min_and_max(path)
+    print(max(abs(data_max), abs(data_min)))
+
