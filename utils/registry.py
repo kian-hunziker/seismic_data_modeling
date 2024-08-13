@@ -26,5 +26,6 @@ model = {
 dataset = {
     "mnist": "dataloaders.MNISTdataloader.MNISTdataset",
     "sine": "dataloaders.simple_waveform.SineWaveLightningDataset",
-    "costarica-small": "dataloaders.costa_rica_small.CostaRicaSmallLighting"
+    "costarica-small": "dataloaders.costa_rica_small.CostaRicaSmallLighting",
+    "costarica-long-seq": "dataloaders.costa_rica_quantized.CostaRicaQuantizedLightning",
 }
