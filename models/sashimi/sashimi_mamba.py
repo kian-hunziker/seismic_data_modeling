@@ -232,6 +232,8 @@ class MambaSashimi(nn.Module):
         residual = None
         for layer in self.d_layers:
             if isinstance(layer, DownPool):
+                if residual is not None:
+                    x = x + residual.transpose(1, 2)
                 x, _ = layer(x)
                 outputs.append(x)
                 residual = None
@@ -240,12 +242,15 @@ class MambaSashimi(nn.Module):
                 x, residual = layer(x, residual, inference_params)
                 x = x.transpose(1, 2)
                 outputs.append(x)
+        if residual is not None:
+            x = x + residual
 
         # Center block
         x = x.transpose(1, 2)
         residual = None
         for layer in self.c_layers:
             x, residual = layer(x, residual, inference_params)
+        x = x + residual
 
         x = x.transpose(1, 2)
         x = x + outputs.pop()  # add a skip connection to the last output of the down block
@@ -268,6 +273,7 @@ class MambaSashimi(nn.Module):
                         x, residual = layer(x, residual, inference_params)
                         x = x.transpose(1, 2)
                         x = x + outputs.pop()
+                x = x + residual.transpose(1, 2)
             else:
                 # not unet
                 residual = None
@@ -279,6 +285,7 @@ class MambaSashimi(nn.Module):
                         x = x.transpose(1, 2)
                     if isinstance(layer, Block):
                         x, residual = layer(x, residual, inference_params)
+                x = x + residual
 
                 x = x.transpose(1, 2)
                 x = x + outputs.pop()  # add a skip connection from the input of the modeling part of this up block
@@ -319,6 +326,9 @@ class MambaSashimi(nn.Module):
         for layer in self.d_layers:
             if isinstance(layer, DownPool):
                 outputs.append(x)
+                if residual is not None:
+                    x = x + residual.squeeze(0)
+
                 x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                 next_state.append(_next_state)
                 residual = None
@@ -333,6 +343,8 @@ class MambaSashimi(nn.Module):
             # x, _next_state = layer.step(x, state=state.pop(), **kwargs)
             # next_state.append(_next_state)
             if x is None: break
+        if residual is not None:
+            x = x + residual.squeeze(0)
 
         # Center block
         if x is None:
@@ -359,13 +371,13 @@ class MambaSashimi(nn.Module):
                 state.pop()
                 x, residual = layer(x, residual, inference_params)
                 next_state.append([])
+            x = x + residual
             x = x.squeeze(0)
             x = x + outputs.pop()
             u_layers = self.u_layers
 
         for block in u_layers:
             if self.unet:
-
                 residual = None
                 for layer in block:
                     if isinstance(layer, Block):
@@ -379,6 +391,7 @@ class MambaSashimi(nn.Module):
                         x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                         next_state.append(_next_state)
                         x = x + outputs.pop()
+                x = x + residual.squeeze(0)
             else:
                 residual = None
                 for layer in block:
@@ -394,6 +407,7 @@ class MambaSashimi(nn.Module):
                         next_state.append(_next_state)
                         x = x + outputs.pop()
                         outputs.append(x)
+                x = x + residual
                 x = x.squeeze(0)
                 x = x + outputs.pop()
 
