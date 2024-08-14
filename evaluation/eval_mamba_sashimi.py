@@ -6,9 +6,9 @@ import copy
 from tqdm import tqdm
 from models.sashimi.sashimi_mamba import MambaSashimi
 from models.mamba_inference_params import InferenceParams
-from evaluation.multiclass_sampling import greedy_prediction, multinomial_prediction, top_k_prediction
+from evaluation.multiclass_sampling import greedy_prediction, multinomial_prediction, top_k_prediction, top_k_top_p_filtering
 
-supported_sampling_modes = ['greedy', 'prob', 'top_k']
+supported_sampling_modes = ['greedy', 'prob', 'top_k', 'top_p']
 
 
 def free_generation_from_default_state(sash, encoder, decoder, length=1024, num_predictions: int = 10,
@@ -80,7 +80,7 @@ def condition(
         context = context.long()
 
     context_len = context.shape[1]
-    inference_params = InferenceParams(max_seqlen=seq_len + context_len + 10, max_batch_size=1)
+    inference_params = InferenceParams(max_seqlen=seq_len + context_len + 10, max_batch_size=context.shape[0])
     state = sashimi.default_state(device=device)
 
     context_output = []
@@ -96,7 +96,7 @@ def condition(
             y, state = sashimi.step(y, state=state, inference_params=inference_params)
             y = decoder(y, state)
             if quantized:
-                y = torch.argmax(y, dim=-1).unsqueeze(0)
+                y = greedy_prediction(y)
             context_output.append(y.detach().cpu())
             inference_params.seqlen_offset += 1
             pbar.update()
@@ -120,6 +120,7 @@ def auto_regressive_generation(
         temperature: float = 1.0,
         sampling_mode: str = 'prob',
         k: int = 10,
+        p: float = 0.0,
         device: str | torch.device = 'cuda'
 ) -> list[torch.Tensor]:
     """
@@ -137,6 +138,7 @@ def auto_regressive_generation(
     :param temperature: Temperature for softmax sampling
     :param sampling_mode: one of ['greedy', 'prob', 'top_k']
     :param k: k for top_k sampling
+    :param p: p for top_p sampling
     :param device: must be 'cuda'
     :return: list of predictions. The first prediction uses greedy sampling
     """
@@ -173,17 +175,16 @@ def auto_regressive_generation(
                 y = decoder(y, state)
 
                 # sample from output. Output dim should be [1, num_classes] in a multiclass setting
-                if quantized and (p_idx == 0 or sampling_mode == 'greedy'):
+                if sampling_mode == 'greedy' or p_idx == 0:
                     y = greedy_prediction(y)
-                elif quantized and p_idx > 0:
-                    if sampling_mode == 'greedy':
-                        y = greedy_prediction(y)
-                    elif sampling_mode == 'prob':
-                        y = multinomial_prediction(y, temperature=temperature)
-                    elif sampling_mode == 'top_k':
-                        y = top_k_prediction(y, k=k, temperature=temperature)
-                    else:
-                        print(f'Unknown sampling mode: {sampling_mode}')
+                elif sampling_mode == 'prob':
+                    y = multinomial_prediction(y, temperature=temperature)
+                elif sampling_mode == 'top_k':
+                    y = top_k_top_p_filtering(y, top_k=k, temperature=temperature)
+                elif sampling_mode == 'top_p':
+                    y = top_k_top_p_filtering(y, top_p=p, temperature=temperature)
+                else:
+                    print(f'Unknown sampling mode: {sampling_mode}')
                 prediction_output.append(y.detach().cpu())
                 inference_params.seqlen_offset += 1
                 pbar.update()
