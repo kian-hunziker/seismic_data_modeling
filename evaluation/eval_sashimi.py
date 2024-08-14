@@ -425,6 +425,32 @@ def plot_multiple_predictions(
         plt.show()
 
 
+def plot_batched_multiple_predictions(
+        full_context: torch.Tensor,
+        predicted_context: torch.Tensor | np.ndarray | list,
+        auto_reg_prediction: list,
+        len_context: int,
+        title: str = '',
+        fig_size: tuple = (10, 5),
+        line_width: int = 3,
+        save_path: str = None,
+        show: bool = True,
+):
+    batch_size = full_context.shape[0]
+    for i in range(batch_size):
+        plot_multiple_predictions(
+            full_context=full_context[i],
+            predicted_context=predicted_context[i],
+            auto_reg_prediction=[p[i] for p in auto_reg_prediction],
+            len_context=len_context,
+            title=title + f'_{i + 1}_of_{batch_size}',
+            fig_size=fig_size,
+            line_width=line_width,
+            save_path=save_path,
+            show=show
+        )
+
+
 def sashimi_eval_test():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     path = '../wandb_logs/MA/2024-07-22__15_29_38/checkpoints/epoch=219-step=15620.ckpt'
