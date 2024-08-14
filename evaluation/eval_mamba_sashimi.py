@@ -13,30 +13,23 @@ supported_sampling_modes = ['greedy', 'prob', 'top_k']
 
 def free_generation_from_default_state(sash, encoder, decoder, length=1024, num_predictions: int = 10,
                                        temperature: float = 1.0):
-    initial_inference_params = InferenceParams(max_seqlen=length + 10, max_batch_size=1)
+    initial_inference_params = InferenceParams(max_seqlen=length + 10, max_batch_size=num_predictions)
     default_state = sash.default_state(device='cuda')
 
-    all_predictions = []
+    state = copy.deepcopy(default_state)
+    inference_params = copy.deepcopy(initial_inference_params)
+    y = torch.zeros(num_predictions, 1).long().to("cuda")
+    ys = []
+    with torch.no_grad():
+        for _ in tqdm(range(length)):
+            y = encoder(y)
+            y, state = sash.step(y, state=state, inference_params=inference_params)
+            y = decoder(y, state)
+            y = multinomial_prediction(y, temperature=temperature)
+            ys.append(y.detach().cpu())
+            inference_params.seqlen_offset += 1
 
-    for i in range(num_predictions):
-        print(f'sample {i + 1} / {num_predictions}')
-        state = copy.deepcopy(default_state)
-        inference_params = copy.deepcopy(initial_inference_params)
-        y = torch.zeros(1, 1).long().to("cuda")
-        ys = []
-        with torch.no_grad():
-            for _ in tqdm(range(length)):
-                y = encoder(y)
-                y, state = sash.step(y, state=state, inference_params=inference_params)
-                y = decoder(y, state)
-                if i == 0:
-                    y = greedy_prediction(y)
-                else:
-                    y = multinomial_prediction(y, temperature=temperature)
-                ys.append(y.detach().cpu())
-                inference_params.seqlen_offset += 1
-
-        all_predictions.append(torch.stack(ys, dim=1))  # y.shape == x.shape
+    all_predictions = torch.stack(ys, dim=1)
     return all_predictions
 
 
