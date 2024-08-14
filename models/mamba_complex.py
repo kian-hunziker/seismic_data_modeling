@@ -142,6 +142,10 @@ class MambaComplex(nn.Module):
     def forward(self, hidden_states, inference_params=None):
         """
         hidden_states: (B, L, D)
+        At inference time (with inference_params is not None and inference_params.seqlen_offset > 0),
+        the step function is called. The hidden states must then have dimension [B, 1, D] / [batch_size, 1, d_state].
+
+        inference_params are updated inplace.
         Returns: same shape as hidden_states
         """
         batch, seqlen, dim = hidden_states.shape
@@ -242,6 +246,14 @@ class MambaComplex(nn.Module):
         return out
 
     def step(self, hidden_states, conv_state, ssm_state):
+        """
+        Compute step
+        :param hidden_states: input of shape [batch_size, 1, d_state]
+        :param conv_state: state of convolution
+        :param ssm_state: state of ssm
+        :return: output of shape [batch_size, 1, d_state]
+        """
+        # hidden states dim: [batch_size, 1, data_dim]
         dtype = hidden_states.dtype
         assert hidden_states.shape[1] == 1, "Only support decoding with 1 token at a time for now"
         xz = self.in_proj(hidden_states.squeeze(1))  # (B 2D)

@@ -155,7 +155,7 @@ class MambaSashimi(nn.Module):
         self.complex = complex
 
         def mamba_block(dim, layer_idx):
-            # make sure, the dt_rank is divisible by 2 which is required to make complex step funciton work
+            # make sure, the dt_rank is divisible by 2 which is required to make complex step function work
             dt_rank = math.ceil(dim / 16)
             if self.complex and dt_rank % 2 != 0:
                 dt_rank += 1
@@ -327,24 +327,24 @@ class MambaSashimi(nn.Module):
             if isinstance(layer, DownPool):
                 outputs.append(x)
                 if residual is not None:
-                    x = x + residual.squeeze(0)
+                    x = x + residual.squeeze(1)
 
                 x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                 next_state.append(_next_state)
                 residual = None
             if isinstance(layer, Block):
                 outputs.append(x)
-                x = x.unsqueeze(0)
+                x = x.unsqueeze(1)
                 state.pop()
                 x, residual = layer(x, residual, inference_params)
                 next_state.append([])
-                x = x.squeeze(0)
+                x = x.squeeze(1)
             # outputs.append(x)
             # x, _next_state = layer.step(x, state=state.pop(), **kwargs)
             # next_state.append(_next_state)
             if x is None: break
         if residual is not None:
-            x = x + residual.squeeze(0)
+            x = x + residual.squeeze(1)
 
         # Center block
         if x is None:
@@ -353,7 +353,6 @@ class MambaSashimi(nn.Module):
             for _ in range(skipped + len(self.c_layers)):
                 next_state.append(state.pop())
             if self.unet:
-                # TODO: add unet support
                 for i in range(skipped):
                     next_state.append(state.pop())
                 u_layers = list(self.u_layers)[skipped // 3:]
@@ -367,12 +366,12 @@ class MambaSashimi(nn.Module):
             residual = None
             for layer in self.c_layers:
                 if x.dim() == 2:
-                    x = x.unsqueeze(0)
+                    x = x.unsqueeze(1)
                 state.pop()
                 x, residual = layer(x, residual, inference_params)
                 next_state.append([])
             x = x + residual
-            x = x.squeeze(0)
+            x = x.squeeze(1)
             x = x + outputs.pop()
             u_layers = self.u_layers
 
@@ -382,22 +381,22 @@ class MambaSashimi(nn.Module):
                 for layer in block:
                     if isinstance(layer, Block):
                         if x.dim() == 2:
-                            x = x.unsqueeze(0)
+                            x = x.unsqueeze(1)
                         state.pop()
                         x, residual = layer(x, residual, inference_params)
                         next_state.append([])
-                        x = x.squeeze(0) + outputs.pop()
+                        x = x.squeeze(1) + outputs.pop()
                     if isinstance(layer, UpPool):
                         x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                         next_state.append(_next_state)
                         x = x + outputs.pop()
-                x = x + residual.squeeze(0)
+                x = x + residual.squeeze(1)
             else:
                 residual = None
                 for layer in block:
                     if isinstance(layer, Block):
                         if x.dim() == 2:
-                            x = x.unsqueeze(0)
+                            x = x.unsqueeze(1)
                         state.pop()
                         x, residual = layer(x, residual, inference_params)
                         next_state.append([])
@@ -408,7 +407,7 @@ class MambaSashimi(nn.Module):
                         x = x + outputs.pop()
                         outputs.append(x)
                 x = x + residual
-                x = x.squeeze(0)
+                x = x.squeeze(1)
                 x = x + outputs.pop()
 
         # feature projection

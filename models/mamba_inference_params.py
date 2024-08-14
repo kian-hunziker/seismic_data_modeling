@@ -5,8 +5,14 @@ from torch import Tensor
 
 @dataclass
 class InferenceParams:
-    """Inference parameters that are passed to the main model in order
-    to efficienly calculate and store the context during inference."""
+    """
+    Inference parameters that are passed to the main model in order
+    to efficiently calculate and store the context during inference.
+
+    Increase seqlen_offset after each inference step
+    key_value_memory_dict maps layer indices to (conv_state, ssm_state):
+    conv_state, ssm_state = inference_params.key_value_memory_dict[layer_idx]
+    """
 
     max_seqlen: int
     max_batch_size: int
