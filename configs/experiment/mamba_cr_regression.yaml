@@ -53,10 +53,10 @@ dataset:
 
 
 scheduler:
-  num_warmup_steps: 10000
-  num_training_steps: 100000
+  num_warmup_steps: 1000
+  num_training_steps: 10000
 
 trainer:
-  max_steps: 100000
+  max_steps: 10000
   max_epochs: 100000
   gradient_clip_val: 1.0
