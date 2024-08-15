@@ -9,6 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 from evaluation.multiclass_sampling import greedy_prediction, multinomial_prediction, top_k_prediction
+from evaluation.multiclass_sampling import top_k_top_p_filtering
 from models.sashimi.sashimi_standalone import Sashimi
 from evaluation.eval_utils import load_checkpoint, get_pipeline_components
 import matplotlib.pyplot as plt
@@ -54,126 +55,6 @@ def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8):
     data = normalize_11_torch(data, d_min=data_min, d_max=data_max)
     data = quantize_encode(data, bits=bits)
     return data
-
-
-def sash_generate_with_context(
-        encoder: nn.Module,
-        decoder: nn.Module,
-        sashimi: Sashimi,
-        context: torch.Tensor | np.ndarray | list,
-        seq_len: int,
-        quantized: bool = False,
-        rnn_mode: str = 'diagonal',
-        sampling_strategy: str = 'greedy',
-        greedy: bool = True,
-        num_predictions: int = 1,
-        k: int = 10,
-        temperature: float = 1.0,
-        device: str | torch.device = 'cpu'
-) -> tuple[torch.Tensor, list[torch.Tensor]]:
-    """
-    Inference using a Sashimi model.
-    The context is used to condition the model. After that, the model generates a sequence of len seq_len
-    in auto-regressive mode. Returns the predictions for the context and the auto-regressively generated sequence
-
-    :param encoder: Encoder
-    :param decoder: Decoder
-    :param sashimi: Sashimi in rnn mode
-    :param context: context for the generation
-    :param seq_len: length of the sequence to generate after the context
-    :param quantized: whether the model works with quantized data in a multiclass setting
-    :param rnn_mode: S4 recurrence mode, e.g. 'diagonal', 'dense', 'linear'. 'diagonal' should be the fastest
-            but might be unstable.
-    :param greedy: If true, use greedy prediction (argmax(pred)), else use probabilistic sampling with softmax
-    :param num_predictions: number of auto-regressive predictions.
-    :param temperature: temperature for softmax sampling
-    :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
-    :return: context prediction, auto-regressive sequences. The first element of the predictions is greedy
-    """
-
-    assert isinstance(sashimi, Sashimi)
-
-    if isinstance(context, np.ndarray):
-        context = torch.from_numpy(context).type(torch.float32)
-    elif isinstance(context, list):
-        context = torch.Tensor(context).type(torch.float32)
-    elif isinstance(context, torch.Tensor):
-        context = context.type(torch.float32)
-
-    if context.dim() == 1:
-        context = context.unsqueeze(0).unsqueeze(-1)
-
-    sashimi = sashimi.to(device)
-    encoder = encoder.to(device)
-    decoder = decoder.to(device)
-
-    sashimi.eval()
-    try:
-        sashimi.setup_rnn(mode=rnn_mode)
-    except:
-        print(f'Could not setup RNN with mode {rnn_mode}')
-        sashimi.setup_rnn()
-    encoder.eval()
-    decoder.eval()
-
-    context = context.to(device)
-    if quantized:
-        context = context.long()
-
-    state = sashimi.default_state(device=device)
-    context_len = context.shape[1]
-    context_output = []
-    all_predictions = []
-
-    # inference in recurrent mode
-    with torch.no_grad():
-        # 'condition' the model by passing the context
-        # teacher forcing approach, the output is saved for plotting but not fed back to model.
-        pbar = tqdm(total=context_len)
-        pbar.set_description('Processing context')
-        for i in range(context_len):
-            y = encoder(context[:, i])
-            y, state = sashimi.step(y, state)
-            y = decoder(y, state)
-            if quantized:
-                y = torch.argmax(y, dim=-1).unsqueeze(0)
-            context_output.append(y.detach().cpu())
-            pbar.update()
-        pbar.close()
-
-        # Auto-regressive generation. The output of the model is used as the next input.
-        conditioned_state = copy.deepcopy(state)
-        if greedy:
-            num_predictions = 1
-
-        for i in range(num_predictions):
-            prediction_output = []
-            y = context_output[-1].to(device)
-            state = copy.deepcopy(conditioned_state)
-
-            pbar = tqdm(total=seq_len)
-            pbar.set_description(f'Auto-regressive generation {i + 1} / {num_predictions}')
-            for _ in range(seq_len):
-                y = encoder(y)
-                y, state = sashimi.step(y, state)
-                y = decoder(y, state)
-                if quantized:
-                    if sampling_strategy == 'greedy' or i == 0:
-                        y = greedy_prediction(y)
-                    elif sampling_strategy == 'prop':
-                        y = multinomial_prediction(y, temperature=temperature)
-                    elif sampling_strategy == 'top_k':
-                        y = top_k_prediction(y, k=k, temperature=temperature)
-                    else:
-                        print(f'Unknown sampling strategy {sampling_strategy}')
-                prediction_output.append(y.detach().cpu())
-                pbar.update()
-            all_predictions.append(torch.stack(prediction_output, dim=1).cpu())
-            pbar.close()
-
-    context_output = torch.stack(context_output, dim=1)
-    # prediction_output = torch.stack(prediction_output, dim=1)
-    return context_output.cpu(), all_predictions
 
 
 def sash_condition(
@@ -229,11 +110,152 @@ def sash_condition(
             y, state = sashimi.step(y, state)
             y = decoder(y, state)
             if quantized:
-                y = torch.argmax(y, dim=-1).unsqueeze(0)
+                y = greedy_prediction(y)
             context_output.append(y.detach().cpu())
             pbar.update()
         pbar.close()
     return torch.stack(context_output, dim=1).cpu(), state
+
+
+def auto_regressive_generation(
+        encoder: nn.Module,
+        decoder: nn.Module,
+        sashimi: Sashimi,
+        initial_state: list,
+        initial_input: torch.Tensor,
+        seq_len: int,
+        num_predictions: int,
+        quantized: bool = False,
+        temperature: float = 1.0,
+        sampling_mode: str = 'prob',
+        k: int = 10,
+        p: float = 0.0,
+        rnn_mode: str = 'dense',
+        device: str | torch.device = 'cpu'
+):
+    assert isinstance(sashimi, Sashimi)
+
+    sashimi = sashimi.to(device)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
+    sashimi.eval()
+    try:
+        sashimi.setup_rnn(mode=rnn_mode)
+    except:
+        print(f'Could not setup RNN with mode {rnn_mode}')
+        sashimi.setup_rnn()
+    encoder.eval()
+    decoder.eval()
+
+    initial_state_copy = copy.deepcopy(initial_state)
+    if quantized:
+        initial_input = initial_input.long()
+    initial_input_copy = initial_input.clone()
+
+    all_predictions = []
+
+    # inference in recurrent mode
+    with torch.no_grad():
+        # Auto-regressive generation. The output of the model is used as the next input.
+        if sampling_mode == 'greedy':
+            num_predictions = 1
+
+        for i in range(num_predictions):
+            prediction_output = []
+            y = initial_input_copy.clone().to(device)
+            state = copy.deepcopy(initial_state_copy)
+
+            pbar = tqdm(total=seq_len)
+            pbar.set_description(f'Auto-regressive generation {i + 1} / {num_predictions}')
+            for _ in range(seq_len):
+                y = encoder(y)
+                y, state = sashimi.step(y, state)
+                y = decoder(y, state)
+                if quantized:
+                    if sampling_mode == 'greedy' or i == 0:
+                        y = greedy_prediction(y)
+                    elif sampling_mode == 'prob':
+                        y = multinomial_prediction(y, temperature=temperature)
+                    elif sampling_mode == 'top_k':
+                        y = top_k_top_p_filtering(y, top_k=k, temperature=temperature)
+                    elif sampling_mode == 'top_p':
+                        y = top_k_top_p_filtering(y, top_p=p, temperature=temperature)
+                    else:
+                        print(f'Unknown sampling mode {sampling_mode}')
+                prediction_output.append(y.detach().cpu())
+                pbar.update()
+            all_predictions.append(torch.stack(prediction_output, dim=1).cpu())
+            pbar.close()
+
+    return all_predictions
+
+
+def sash_generate_with_context(
+        encoder: nn.Module,
+        decoder: nn.Module,
+        sashimi: Sashimi,
+        context: torch.Tensor | np.ndarray | list,
+        seq_len: int,
+        quantized: bool = False,
+        rnn_mode: str = 'dense',
+        sampling_strategy: str = 'greedy',
+        num_predictions: int = 1,
+        k: int = 10,
+        p: float = 0.0,
+        temperature: float = 1.0,
+        device: str | torch.device = 'cpu'
+) -> tuple[torch.Tensor, list[torch.Tensor]]:
+    """
+    Inference using a Sashimi model.
+    The context is used to condition the model. After that, the model generates a sequence of len seq_len
+    in auto-regressive mode. Returns the predictions for the context and the auto-regressively generated sequence
+
+    :param encoder: Encoder
+    :param decoder: Decoder
+    :param sashimi: Sashimi in rnn mode
+    :param context: context for the generation
+    :param seq_len: length of the sequence to generate after the context
+    :param quantized: whether the model works with quantized data in a multiclass setting
+    :param rnn_mode: S4 recurrence mode, e.g. 'diagonal', 'dense', 'linear'. 'diagonal' should be the fastest
+            but might be unstable.
+    :param sampling_strategy: sampling strategy for quantized data. One of ['greedy', 'prob', 'top_k', 'top_p']
+    :param num_predictions: number of auto-regressive predictions.
+    :param k: k for top_k sampling
+    :param p: p for top_p sampling
+    :param temperature: temperature for softmax sampling
+    :param device: device (e.g. 'cpu' or 'cuda', 'mps' does not work)
+    :return: context prediction, auto-regressive sequences. The first element of the predictions is greedy
+    """
+
+    # condition the model
+    cp, conditioned_state = sash_condition(
+        encoder=encoder,
+        decoder=decoder,
+        sashimi=sashimi,
+        context=context,
+        quantized=quantized,
+        rnn_mode=rnn_mode,
+        device=device
+    )
+    # auto-regressive generation
+    predictions = auto_regressive_generation(
+        encoder=encoder,
+        decoder=decoder,
+        sashimi=sashimi,
+        initial_state=copy.deepcopy(conditioned_state),
+        initial_input=cp[:, -1, :],
+        seq_len=seq_len,
+        quantized=quantized,
+        num_predictions=num_predictions,
+        temperature=temperature,
+        sampling_mode=sampling_strategy,
+        k=k,
+        p=p,
+        rnn_mode='dense',
+        device=device
+    )
+    return cp.cpu(), predictions
 
 
 def sash_generate_without_context(
@@ -421,6 +443,7 @@ def plot_multiple_predictions(
     plt.tight_layout()
     if save_path is not None:
         plt.savefig(os.path.join(save_path, '{}.png'.format(title)))
+        plt.close()
     if show:
         plt.show()
 
@@ -443,7 +466,7 @@ def plot_batched_multiple_predictions(
             predicted_context=predicted_context[i],
             auto_reg_prediction=[p[i] for p in auto_reg_prediction],
             len_context=len_context,
-            title=title + f'_{i + 1}_of_{batch_size}',
+            title=title + f'_{i + 1:02}_of_{batch_size}',
             fig_size=fig_size,
             line_width=line_width,
             save_path=save_path,
