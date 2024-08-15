@@ -1,8 +1,14 @@
 import datetime
 import os
+import threading
+import time
+import traceback
+
 import hydra
 import omegaconf
 import re
+
+import psutil
 import yaml
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -324,45 +330,60 @@ def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bo
 
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def main(config: OmegaConf) -> None:
-    print('*' * 32)
-    print('CONFIGURATION')
-    print(OmegaConf.to_yaml(config))
-    print('*' * 32, '\n\n')
+    try:
+        print('*' * 32)
+        print('CONFIGURATION')
+        print(OmegaConf.to_yaml(config))
+        print('*' * 32, '\n\n')
 
-    print(f'cuda available: {torch.cuda.is_available()}')
+        print(f'cuda available: {torch.cuda.is_available()}')
 
-    if config.train.get("ckpt_path", None) is not None:
-        print(f'loading checkpoint from {config.train.ckpt_path}')
-        model, hparams, ckpt_path = load_checkpoint(config.train.ckpt_path, return_path=True)
-        trainer = create_trainer(config)
-    else:
-        trainer = create_trainer(config)
-        model = LightningSequenceModel(config)
+        if config.train.get("ckpt_path", None) is not None:
+            print(f'loading checkpoint from {config.train.ckpt_path}')
+            model, hparams, ckpt_path = load_checkpoint(config.train.ckpt_path, return_path=True)
+            trainer = create_trainer(config)
+        else:
+            trainer = create_trainer(config)
+            model = LightningSequenceModel(config)
 
-    plot_and_save_training_examples(model, trainer, num_examples=16)
+        plot_and_save_training_examples(model, trainer, num_examples=16)
 
-    summary = ModelSummary(model, max_depth=1)
-    print('\n', '*' * 32, '\n')
-    print('SUMMARY')
-    print(summary)
+        summary = ModelSummary(model, max_depth=1)
+        print('\n', '*' * 32, '\n')
+        print('SUMMARY')
+        print(summary)
 
-    print('\n', '*' * 32, '\n')
-    print('ENCODER')
-    print(model.encoder)
-    print('\n', '*' * 32, '\n')
+        print('\n', '*' * 32, '\n')
+        print('ENCODER')
+        print(model.encoder)
+        print('\n', '*' * 32, '\n')
 
-    print('DECODER')
-    print(model.decoder)
-    print('*' * 32, '\n\n')
+        print('DECODER')
+        print(model.decoder)
+        print('*' * 32, '\n\n')
 
-    if config.train.get("ckpt_path", None) is not None:
-        trainer.fit(model, ckpt_path=ckpt_path)
-    else:
-        trainer.fit(model)
+        if config.train.get("ckpt_path", None) is not None:
+            trainer.fit(model, ckpt_path=ckpt_path)
+        else:
+            trainer.fit(model)
 
-    print('\n', '*' * 32, '\n')
-    print('DONE')
-    print('\n', '*' * 32, '\n')
+        print('\n', '*' * 32, '\n')
+        print('DONE')
+        print('\n', '*' * 32, '\n')
+    except Exception as e:
+        traceback.print_exc()
+    finally:
+        # FIXME: workaround to prevent wandb from blocking the termination of runs on sciCORE slurm
+        def aux(pid, timeout=60):
+            time.sleep(timeout)
+            print(f"Program did not terminate successfully, killing process tree")
+            parent = psutil.Process(pid)
+            for child in parent.children(recursive=True):
+                child.kill()
+            parent.kill()
+
+        shutdown_cleanup_thread = threading.Thread(target=aux, args=(os.getpid(), 60), daemon=True)
+        shutdown_cleanup_thread.start()
 
 
 if __name__ == '__main__':
