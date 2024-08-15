@@ -56,7 +56,7 @@ def eval_model(
 
     # check if dataset has quantized parameter. If the parameter does not exist, we assume the data was quantized
     try:
-        quantized = hparams['dataset']['quantized']
+        quantized = hparams['dataset']['quantize']
     except:
         quantized = True
     print(f'\nData is quantized: {quantized}')

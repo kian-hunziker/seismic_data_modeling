@@ -78,6 +78,10 @@ def condition(
     context = context.to(device)
     if quantized:
         context = context.long()
+    else:
+        context = context.float()
+        if context.dim() == 2:
+            context = context.unsqueeze(-1)
 
     context_len = context.shape[1]
     inference_params = InferenceParams(max_seqlen=seq_len + context_len + 10, max_batch_size=context.shape[0])
