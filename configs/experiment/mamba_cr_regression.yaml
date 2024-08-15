@@ -1,0 +1,62 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: cr_small
+  - /task: regression
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: mamba_sashimi
+
+experiment_name: mamba_cr_regression
+
+model:
+  d_model: 64
+  n_layers: 3
+  expand: 2
+  ff: 2
+  pool:
+    - 16
+    - 16
+  dropout: 0.0
+  unet: False
+  complex: True
+  # prenorm: True
+  # layer:
+  #   n_ssm: 1
+
+train:
+  monitor: val/loss
+  mode: min
+
+task:
+  metrics:
+    - log_mse
+    - mse
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: linear
+
+loader:
+  batch_size: 16
+
+dataset:
+  sample_len: 61440
+  downsample: 200
+  normalize_const: 783285
+  quantize: False
+  bits: 8
+
+
+scheduler:
+  num_warmup_steps: 10000
+  num_training_steps: 100000
+
+trainer:
+  max_steps: 100000
+  max_epochs: 100000
+  gradient_clip_val: 1.0
