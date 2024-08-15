@@ -26,7 +26,14 @@ except:
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def eval_model(model_path):
+def eval_model(
+        model_path: str,
+        num_pred: int = 10,
+        num_days_to_predict: int = 3,
+        sampling_mode: str = 'prob',
+        k: int = 10,
+        p: float = 0.0,
+):
     print('*' * 32)
     print('Evaluating')
     print('*' * 32, '\n\n')
@@ -106,15 +113,13 @@ def eval_model(model_path):
     is_mamba = not isinstance(model, Sashimi)
     print(f'Model is Mamba: {is_mamba}')
 
-    num_samples_per_day = 200# int(8_640_000 / downsample)
+    num_samples_per_day = int(8_640_000 / downsample)
 
     conditioning_day_numbers = [1, 2, 4, 8, 12]
     batch_size = 32
-    eval_length_days = 1#3
-    num_predictions = 3#10
-    sampling_mode = 'prob'  # one of ['greedy', 'prob', 'top_k', 'top_p']
-    k = 20
-    p = 0.8
+    eval_length_days = num_days_to_predict
+    num_predictions = num_pred
+    sampling_mode = sampling_mode  # one of ['greedy', 'prob', 'top_k', 'top_p']
 
     # main evaluation loop
     for conditioning_day in conditioning_day_numbers:
@@ -211,5 +216,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--path', type=str, required=True, help='path to checkpoint')
+    parser.add_argument('--sampling_mode', type=str, default='prob', choices=['greedy', 'prob', 'top_k', 'top_p'], help='sampling mode')
+    parser.add_argument('--k', type=int, default=10, help='k for top_k sampling')
+    parser.add_argument('--p', type=float, default=0.0, help='p for top_p sampling')
+    parser.add_argument('--num_pred', type=int, default=10, help='number of predictions')
+    parser.add_argument('--pred_days', type=int, default=3, help='number of days to predict')
     args = parser.parse_args()
-    eval_model(args.path)
+
+    eval_model(
+        model_path=args.path,
+        num_pred=args.num_pred,
+        num_days_to_predict=args.pred_days,
+        sampling_mode=args.sampling_mode,
+        k=args.k,
+        p=args.p
+    )
