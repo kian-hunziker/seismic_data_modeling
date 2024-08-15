@@ -1,0 +1,51 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: cr_small_long_seq
+  - /task: classification
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: mamba_sashimi
+
+experiment_name: mamba_cr_complex_long_seq_8layers
+
+model:
+  d_model: 64
+  n_layers: 8
+  expand: 2
+  ff: 2
+  pool:
+    - 16
+    - 16
+  dropout: 0.0
+  unet: False
+  complex: True
+
+train:
+  monitor: val/loss
+  mode: min
+
+dataset:
+  sample_len: 999424
+  downsample: 200
+  bits: 8
+
+encoder:
+  _name_: embedding
+
+decoder:
+  _name_: linear
+
+loader:
+  batch_size: 2
+
+scheduler:
+  num_warmup_steps: 2000
+  num_training_steps: 20000
+
+trainer:
+  max_steps: 20000
+  max_epochs: 20000
+  gradient_clip_val: 1.0
