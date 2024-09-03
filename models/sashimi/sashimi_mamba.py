@@ -112,6 +112,7 @@ class UpPool(nn.Module):
         return state
 
 
+'''
 class DownPoolSimple(nn.Module):
     def __init__(self, d_input, expand, pool):
         super().__init__()
@@ -182,6 +183,80 @@ class UpPoolSimple(nn.Module):
             assert x is not None
             x = x.unsqueeze(-1)
             x = self.conv(x)
+            state = list(torch.unbind(x, dim=-1))
+        else:
+            assert x is None
+        return y, state
+
+    def default_state(self, *batch_shape, device=None):
+        state = torch.zeros(batch_shape + (self.d_output, self.pool), device=device)  # (batch, h, s)
+        state = list(torch.unbind(state, dim=-1))  # List of (..., H)
+        return state
+'''
+
+
+class DownPoolSimple(nn.Module):
+    def __init__(self, d_input, expand, pool):
+        super().__init__()
+        self.d_output = d_input * expand
+        self.pool = pool
+
+        self.lin = nn.Conv1d(in_channels=d_input, out_channels=self.d_output, kernel_size=1, stride=1)
+
+    def forward(self, x):
+        x = F.interpolate(x, size=x.shape[-1] // self.pool, mode='linear', align_corners=False)
+        x = self.lin(x)
+        return x, None
+
+    def step(self, x, state, **kwargs):
+        """
+        x: (..., H)
+        """
+
+        if x is None: return None, state
+        state.append(x)
+        if len(state) == self.pool:
+            x = torch.stack(state, dim=-1)
+            x = F.interpolate(x, size=x.shape[-1] // self.pool, mode='linear', align_corners=False)
+            x = self.lin(x)
+            x = x.squeeze(-1)
+            return x, []
+        else:
+            return None, state
+
+    def default_state(self, *args, **kwargs):
+        return []
+
+
+class UpPoolSimple(nn.Module):
+    def __init__(self, d_input, expand, pool):
+        super().__init__()
+        self.d_output = d_input // expand
+        self.pool = pool
+
+        self.lin = nn.Conv1d(in_channels=d_input, out_channels=self.d_output, kernel_size=1, stride=1)
+
+    def forward(self, x, skip=None):
+        x = F.interpolate(x, size=x.shape[-1] * self.pool, mode='nearest')
+        x = self.lin(x)
+
+        x = F.pad(x[..., :-self.pool], (self.pool, 0))  # Shift to ensure causality
+
+        if skip is not None:
+            x = x + skip
+        return x, None
+
+    def step(self, x, state, **kwargs):
+        """
+        x: (..., H)
+        """
+        assert len(state) > 0
+        y, state = state[0], state[1:]
+        if len(state) == 0:
+            assert x is not None
+            x = x.unsqueeze(-1)
+            x = F.interpolate(x, size=x.shape[-1] * self.pool, mode='nearest')
+            x = self.lin(x)
             state = list(torch.unbind(x, dim=-1))
         else:
             assert x is None
