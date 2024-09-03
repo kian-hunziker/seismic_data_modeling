@@ -364,7 +364,7 @@ class MambaSashimi(nn.Module):
             block = []
             H //= expand
             if simple_up_down:
-                block.append(UpPoolSimple(H, expand, p))
+                block.append(UpPoolSimple(H * expand, expand, p))
             else:
                 block.append(UpPool(H * expand, expand, p))
 
