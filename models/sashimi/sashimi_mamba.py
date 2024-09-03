@@ -394,7 +394,7 @@ class MambaSashimi(nn.Module):
         outputs.append(x)
         residual = None
         for layer in self.d_layers:
-            if isinstance(layer, DownPool):
+            if isinstance(layer, DownPool) or isinstance(layer, DownPoolSimple):
                 if residual is not None:
                     x = x + residual.transpose(1, 2)
                 x, _ = layer(x)
@@ -427,7 +427,7 @@ class MambaSashimi(nn.Module):
                 #    x = x + outputs.pop() # skip connection
                 residual = None
                 for layer in block:
-                    if isinstance(layer, UpPool):
+                    if isinstance(layer, UpPool) or isinstance(layer, UpPoolSimple):
                         x, _ = layer(x)
                         x = x + outputs.pop()
 
@@ -441,7 +441,7 @@ class MambaSashimi(nn.Module):
                 # not unet
                 residual = None
                 for layer in block:
-                    if isinstance(layer, UpPool):
+                    if isinstance(layer, UpPool) or isinstance(layer, UpPoolSimple):
                         x, _ = layer(x)
                         x = x + outputs.pop()
                         outputs.append(x)
@@ -487,7 +487,7 @@ class MambaSashimi(nn.Module):
         next_state = []
         residual = None
         for layer in self.d_layers:
-            if isinstance(layer, DownPool):
+            if isinstance(layer, DownPool) or isinstance(layer, DownPoolSimple):
                 outputs.append(x)
                 if residual is not None:
                     x = x + residual.squeeze(1)
@@ -549,7 +549,7 @@ class MambaSashimi(nn.Module):
                         x, residual = layer(x, residual, inference_params)
                         next_state.append([])
                         x = x.squeeze(1) + outputs.pop()
-                    if isinstance(layer, UpPool):
+                    if isinstance(layer, UpPool) or isinstance(layer, UpPoolSimple):
                         x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                         next_state.append(_next_state)
                         x = x + outputs.pop()
@@ -564,7 +564,7 @@ class MambaSashimi(nn.Module):
                         x, residual = layer(x, residual, inference_params)
                         next_state.append([])
 
-                    if isinstance(layer, UpPool):
+                    if isinstance(layer, UpPool) or isinstance(layer, UpPoolSimple):
                         x, _next_state = layer.step(x, state=state.pop(), **kwargs)
                         next_state.append(_next_state)
                         x = x + outputs.pop()
