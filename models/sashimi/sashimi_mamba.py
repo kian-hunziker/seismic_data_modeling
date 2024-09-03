@@ -112,6 +112,87 @@ class UpPool(nn.Module):
         return state
 
 
+class DownPoolSimple(nn.Module):
+    def __init__(self, d_input, expand, pool):
+        super().__init__()
+        self.d_output = d_input * expand
+        self.pool = pool
+
+        self.conv = nn.Conv1d(
+            in_channels=d_input,
+            out_channels=self.d_output,
+            kernel_size=pool,
+            stride=pool,
+            bias=False
+        )
+
+    def forward(self, x):
+        x = self.conv(x)
+        return x, None
+
+    def step(self, x, state, **kwargs):
+        """
+        x: (..., H)
+        """
+
+        if x is None: return None, state
+        state.append(x)
+        if len(state) == self.pool:
+            x = torch.stack(state, dim=-1)
+            x = self.conv(x)
+            x = x.squeeze(-1)
+            return x, []
+        else:
+            return None, state
+
+    def default_state(self, *args, **kwargs):
+        return []
+
+
+class UpPoolSimple(nn.Module):
+    def __init__(self, d_input, expand, pool):
+        super().__init__()
+        self.d_output = d_input // expand
+        self.pool = pool
+
+        self.conv = nn.ConvTranspose1d(
+            in_channels=d_input,
+            out_channels=self.d_output,
+            kernel_size=pool,
+            stride=pool,
+            padding=0
+        )
+
+    def forward(self, x, skip=None):
+        x = self.conv(x)
+
+        x = F.pad(x[..., :-self.pool], (self.pool, 0))  # Shift to ensure causality
+
+        if skip is not None:
+            x = x + skip
+        return x, None
+
+    def step(self, x, state, **kwargs):
+        """
+        x: (..., H)
+        """
+        assert len(state) > 0
+        y, state = state[0], state[1:]
+        if len(state) == 0:
+            assert x is not None
+            x = x.unsqueeze(-1)
+            x = self.conv(x)
+            state = list(torch.unbind(x, dim=-1))
+        else:
+            assert x is None
+        return y, state
+
+    def default_state(self, *batch_shape, device=None):
+        state = torch.zeros(batch_shape + (self.d_output, self.pool), device=device)  # (batch, h, s)
+        state = list(torch.unbind(state, dim=-1))  # List of (..., H)
+        return state
+
+
 class MambaSashimi(nn.Module):
     def __init__(
             self,
@@ -124,6 +205,7 @@ class MambaSashimi(nn.Module):
             unet=False,
             dropout=0.0,
             complex=False,
+            simple_up_down=False,
             **s4_args,
     ):
         """
@@ -188,7 +270,10 @@ class MambaSashimi(nn.Module):
                     # if ff > 0: d_layers.append(ff_block(H))
 
             # Add sequence downsampling and feature expanding
-            d_layers.append(DownPool(H, expand, p))
+            if simple_up_down:
+                d_layers.append(DownPoolSimple(H, expand, p))
+            else:
+                d_layers.append(DownPool(H, expand, p))
             H *= expand
 
         # Center block
@@ -203,7 +288,10 @@ class MambaSashimi(nn.Module):
         for p in pool[::-1]:
             block = []
             H //= expand
-            block.append(UpPool(H * expand, expand, p))
+            if simple_up_down:
+                block.append(UpPoolSimple(H, expand, p))
+            else:
+                block.append(UpPool(H * expand, expand, p))
 
             for _ in range(n_layers):
                 block.append(mamba_block(H, layer_idx))
