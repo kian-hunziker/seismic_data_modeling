@@ -54,7 +54,7 @@ def condition(
     :param device: must be 'cuda' for Mamba to work
     :return: predicted context, state, inference params
     """
-    assert isinstance(sashimi, MambaSashimi)
+    #assert isinstance(sashimi, MambaSashimi)
     assert device == 'cuda'
 
     if isinstance(context, np.ndarray):
@@ -231,7 +231,7 @@ def mamba_generate_with_context(
             sequences is greedy sampling
     """
 
-    assert isinstance(sashimi, MambaSashimi)
+    #assert isinstance(sashimi, MambaSashimi)
     assert device == 'cuda'
     assert sampling_mode in supported_sampling_modes
 
