@@ -61,6 +61,11 @@ def eval_model(
         quantized = True
     print(f'\nData is quantized: {quantized}')
 
+    try:
+        bits = hparams['dataset']['bits']
+    except:
+        bits = 8
+
     downsample = hparams['dataset']['downsample']
     print(f'downsample: {downsample}')
 
@@ -82,8 +87,8 @@ def eval_model(
     print(f'Test data shape: {test_data.shape}')
 
     if quantized:
-        train_data_encoded = evaluation.eval_sashimi.prepare_data(train_data, downsample=downsample, bits=8)
-        test_data_encoded = evaluation.eval_sashimi.prepare_data(test_data, downsample=downsample, bits=8)
+        train_data_encoded = evaluation.eval_sashimi.prepare_data(train_data, downsample=downsample, bits=bits)
+        test_data_encoded = evaluation.eval_sashimi.prepare_data(test_data, downsample=downsample, bits=bits)
     else:
         normalize_const = hparams['dataset']['normalize_const']
         train_data_encoded = decimate(train_data / float(normalize_const), q=downsample)
