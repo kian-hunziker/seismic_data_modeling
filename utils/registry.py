@@ -29,4 +29,5 @@ dataset = {
     "sine": "dataloaders.simple_waveform.SineWaveLightningDataset",
     "costarica-small": "dataloaders.costa_rica_small.CostaRicaSmallLighting",
     "costarica-long-seq": "dataloaders.costa_rica_quantized.CostaRicaQuantizedLightning",
+    "costarica-bpe": "dataloaders.costa_rica_bpe.CostaRicaBPELightning"
 }
