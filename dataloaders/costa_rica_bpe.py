@@ -31,7 +31,7 @@ class CostaRicaBPE(Dataset):
         self.tokenizer = BPETokenizer()
         self.tokenizer.load_vocab('bpe_vocab_4096_d100_train')
 
-        self.data = torch.load(directory).float()
+        self.data = torch.load(directory).long()
 
         total_num_samples = len(self.data)
         num_train_samples = int(total_num_samples * 0.95)

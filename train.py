@@ -265,7 +265,7 @@ def plot_and_save_training_examples(model: LightningSequenceModel, trainer: pl.T
 
     x, _ = next(iter(model.dataset.train_dataloader(batch_size=num_examples)))
 
-    for i in range(num_examples):
+    for i in range(x.shape[0]):
         fig, ax = plt.subplots(figsize=(40, 10))
         ax.plot(x[i].squeeze().cpu().numpy())
         plt.suptitle(f'Training example {i}')
