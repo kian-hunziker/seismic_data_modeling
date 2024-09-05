@@ -54,7 +54,7 @@ class CostaRicaBPE(Dataset):
         start_idx = torch.randint(low=0, high=self.num_samples - self.sample_len - 1, size=(1,)).item()
         stop_idx = start_idx + self.sample_len
 
-        x_plus_one = self.data[start_idx:stop_idx]
+        x_plus_one = self.data[start_idx:stop_idx + 1]
         return x_plus_one[:-1].unsqueeze(-1), x_plus_one[1:].unsqueeze(-1)
 
     def get_tokenizer(self):
