@@ -341,6 +341,11 @@ def main(config: OmegaConf) -> None:
         if config.train.get("ckpt_path", None) is not None:
             print(f'loading checkpoint from {config.train.ckpt_path}')
             model, hparams, ckpt_path = load_checkpoint(config.train.ckpt_path, return_path=True)
+            # fixes for sequence length warmup
+            # reload the dataset, updates the sample length
+            model.dataset = instantiate(registry.dataset, config.dataset)
+            # update the batch size
+            model.hparams.loader.batch_size = config.loader.batch_size
             trainer = create_trainer(config)
         else:
             trainer = create_trainer(config)
