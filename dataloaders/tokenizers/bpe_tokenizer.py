@@ -68,7 +68,7 @@ class BPETokenizer():
         p_bar = tqdm(total=vocab_size, initial=len(self.vocab))
         p_bar.set_description('Learning BPE')
         while len(self.vocab) < vocab_size:
-            #print(f'vocab size: {len(self.vocab)} / {vocab_size}')
+            # print(f'vocab size: {len(self.vocab)} / {vocab_size}')
 
             # compute pair frequencies
             pair_freqs = compute_pair_freqs(splits)
@@ -118,22 +118,25 @@ class BPETokenizer():
         :return: tokens (list), IDs (torch.Tensor)
         """
         if sequence.dim() == 1:
-            splits = [sequence.tolist()]
+            sequences = [sequence.tolist()]
         else:
-            splits = sequence.tolist()
+            sequences = sequence.tolist()
+
         for pair, merge in self.merges.items():
-            for idx, split in enumerate(splits):
+            for idx, split in enumerate(sequences):
                 i = 0
                 while i < len(split) - 1:
                     if split[i] == pair[0] and split[i + 1] == pair[1]:
                         split[i:i + 2] = [merge]
                     else:
                         i += 1
-                splits[idx] = split
+                sequences[idx] = split
 
-        tokens = sum(splits, [])
-        ids = [self.vocab.index(t) for t in tokens]
-        return tokens, torch.tensor(ids).long()
+        # tokens = sum(sequences, [])
+        ids = [torch.tensor([self.vocab.index(t) for t in tokens]).long() for tokens in sequences]
+        if len(ids) == 1:
+            ids = ids[0]
+        return sequences, ids
 
     def _flatten_list(self, lst: list) -> list:
         # Initialize an empty list to store the integers
@@ -152,17 +155,17 @@ class BPETokenizer():
 
     def decode(self, ids: list | torch.Tensor) -> torch.Tensor:
         if isinstance(ids, torch.Tensor):
-            ids = ids.tolist()
+            ids = ids.squeeze().tolist()
 
         if not isinstance(ids[0], list):
             ids = [ids]
 
-        decoded = []
-        for seq_ids in ids:
-            tokens = [self.vocab[i] for i in seq_ids]
-            decoded.append(self._flatten_list(tokens))
-        decoded = torch.tensor(decoded)
-        return decoded
+        all_sequences_decoded = []
+        for seq in ids:
+            tokens = [self.vocab[i] for i in seq]
+            decoded = self._flatten_list(tokens)
+            all_sequences_decoded.append(torch.tensor(decoded))
+        return all_sequences_decoded
 
     def decode_to_tokens(self, ids: list | torch.Tensor) -> list:
         if isinstance(ids, torch.Tensor):
@@ -197,8 +200,8 @@ class BPETokenizer():
         # Define the absolute path to the 'vocabularies' subdirectory
         vocab_dir = os.path.join(current_dir, 'vocabularies')
         file_list = glob.glob(os.path.join(vocab_dir, '*'))
-        #print('Available vocabularies:')
-        #print(file_list)
+        # print('Available vocabularies:')
+        # print(file_list)
         return file_list
 
     def load_vocab(self, name: str):
@@ -220,6 +223,7 @@ class BPETokenizer():
         save_dir = os.path.join(current_dir, 'vocabularies/' + name)
         torch.save((self.vocab, self.merges), save_dir)
         print(f'Saved vocab and merges to: {save_dir}')
+
 
 def get_test_data_5_days():
     data_path = '../data/costa_rica/small_subset'
@@ -267,6 +271,7 @@ def train_test():
 
     tokenizer.save_vocab('test_vocab')
 
+
 def load_vocab_test():
     tokenizer = BPETokenizer()
     vocab_list = tokenizer.get_available_vocabularies()
@@ -274,6 +279,34 @@ def load_vocab_test():
     print(tokenizer.get_vocab())
 
 
+def decode_test():
+    tokenizer = BPETokenizer()
+    tokenizer.load_vocab('bpe_vocab_4096_d100_train')
+    vocab_size = tokenizer.get_vocab_size()
+    batch_size = 16
+    seq_len = 1024
+    x_ids = torch.load('../data/costa_rica/bpe_small/cr_small_bpe_encoded_ids.pt')[:batch_size * seq_len].reshape(
+        batch_size, seq_len).unsqueeze(-1)
+    x_decoded_batch = tokenizer.decode(x_ids)
+    x_decoded_single_tensor = tokenizer.decode(x_ids[0])
+    x_decoded_list = tokenizer.decode([2, 500, 2000, 3000, 4000, 1234, 2345])
+    print('done')
+
+
+def encode_test():
+    tokenizer = BPETokenizer()
+    tokenizer.load_vocab('test_vocab')
+    vocab_size = tokenizer.get_vocab_size()
+    batch_size = 5
+    seq_len = 1024
+    x = get_test_data_5_days()
+    x_encoded_batch = tokenizer.encode(x[:batch_size])
+    x_encoded_single_tensor = tokenizer.encode(x[0])
+    print(x.shape)
+
+
 if __name__ == '__main__':
-    train_test()
-    load_vocab_test()
+    # train_test()
+    # load_vocab_test()
+    # decode_test()
+    encode_test()
