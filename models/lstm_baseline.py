@@ -86,10 +86,10 @@ class LSTMSequenceModel(nn.Module):
 
     def forward(self, x, state=None):
         if state is None:
-            state = []
+            #state = []
             for i in range(self.n_layers):
                 x, s = self.net[i](x, None)
-                state.append(s)
+                #state.append(s)
         else:
             for i in range(self.n_layers):
                 x, state[i] = self.net[i](x, state[i])

@@ -1,0 +1,50 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: sine/multiple_freq_quantized
+  - /task: classification
+  - /optimizer: adamw
+  - /scheduler: cosine_warmup
+  - /model: lstm
+
+experiment_name: lstm_sine
+
+model:
+  d_model: 64
+  n_layers: 8
+  residual: True
+  gating: True
+  layer_norm: True
+
+train:
+  #ckpt_path: wandb_logs/MA/2024-09-06__16_06_55
+  monitor: val/loss
+  mode: min
+
+encoder:
+  _name_: embedding
+
+decoder:
+  _name_: linear
+
+loader:
+  batch_size: 32
+
+scheduler:
+  num_warmup_steps: 10000
+  num_training_steps: 100000
+
+trainer:
+  max_steps: 100000
+  max_epochs: 100000
+  log_every_n_steps: 1
+  gradient_clip_val: 1.0
+
+dataset:
+  overwrite_existing_file: False
+  sample_len: 8192
+
+optimizer:
+  lr: 0.002
