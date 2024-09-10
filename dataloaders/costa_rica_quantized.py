@@ -21,7 +21,7 @@ class CostaRicaQuantized(Dataset):
             sample_len: int = 2048,
             downsample: int = 1,
             bits: int = 8,
-            train: bool = True
+            train: str = 'train'
     ):
         super().__init__()
 
@@ -49,10 +49,14 @@ class CostaRicaQuantized(Dataset):
         # use 95% as training and 5% as test examples
         # training will be further split into train and validation subsets
         self.num_train_examples = int(len(self.file_paths) * 0.95)
+        self.num_val_examples = int(len(self.file_paths) * 0.10)
         self.file_paths = [f['path'] for f in sorted_metadata]
-        if self.train:
-            self.file_paths = self.file_paths[:self.num_train_examples]
-            sorted_metadata = sorted_metadata[:self.num_train_examples]
+        if self.train == 'train':
+            self.file_paths = self.file_paths[:self.num_train_examples - self.num_val_examples]
+            sorted_metadata = sorted_metadata[:self.num_train_examples - self.num_val_examples]
+        elif self.train == 'val':
+            self.file_paths = self.file_paths[self.num_train_examples - self.num_val_examples: self.num_train_examples]
+            sorted_metadata = sorted_metadata[self.num_train_examples - self.num_val_examples: self.num_train_examples]
         else:
             self.file_paths = self.file_paths[self.num_train_examples:]
             sorted_metadata = sorted_metadata[self.num_train_examples:]
@@ -60,7 +64,7 @@ class CostaRicaQuantized(Dataset):
         # extract sequences of consecutive recordings
         self.sequences = cu.extract_sequences_from_metadata_list(sorted_metadata)
 
-        # arange consecutive recordings in short sequences which can provide a sample of the desired length
+        # arrange consecutive recordings in short sequences which can provide a sample of the desired length
         self.tuples = []
         for s in self.sequences:
             if len(s) >= self.seq_len:
@@ -125,17 +129,24 @@ class CostaRicaQuantizedLightning(SequenceDataset):
             sample_len=self.hparams.sample_len,
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
-            train=True
+            train='train'
+        )
+        self.dataset_val = CostaRicaQuantized(
+            directory=self.data_dir,
+            sample_len=self.hparams.sample_len,
+            downsample=self.hparams.downsample,
+            bits=self.hparams.bits,
+            train='val'
         )
         self.dataset_test = CostaRicaQuantized(
             directory=self.data_dir,
             sample_len=int(8600000 / self.hparams.downsample),
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
-            train=False
+            train='test'
         )
-        self.split_train_val(self.hparams.val_split)
-        self.num_classes = 2 ** self.dataset_train.dataset.bits
+        #self.split_train_val(self.hparams.val_split)
+        self.num_classes = 2 ** self.dataset_train.bits
 
 
 def initialize_dataset_test():
@@ -165,9 +176,9 @@ def initialize_dataset_test():
 
 
 def simple_lightning_test():
-    data_path = 'data/costa_rica/small_subset'
-    sample_len = 239616
-    downsample = 200
+    data_path = 'data/costa_rica/cove_rifo_15_16_hhz'
+    sample_len = 1048576
+    downsample = 100
 
     data_config = {
         'sample_len': sample_len,
@@ -205,9 +216,9 @@ def simple_lightning_test():
     plt.title("Test example lightning")
     plt.show()
 
-    print(train_loader.dataset.dataset.tuples[0])
+    print(train_loader.dataset.tuples[0])
 
 
 if __name__ == '__main__':
-    initialize_dataset_test()
+    #initialize_dataset_test()
     simple_lightning_test()
