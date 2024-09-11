@@ -22,7 +22,8 @@ model = {
     "conv_net": "models.simple_test_models.ConvNet",
     "mamba-sashimi": "models.sashimi.sashimi_mamba.MambaSashimi",
     "pure-mamba": "models.pure_mamba.PureMamba",
-    "lstm": "models.lstm_baseline.LSTMSequenceModel"
+    "lstm": "models.lstm_baseline.LSTMSequenceModel",
+    "identity": "models.simple_test_models.IdentityModel"
 }
 
 dataset = {
@@ -30,5 +31,6 @@ dataset = {
     "sine": "dataloaders.simple_waveform.SineWaveLightningDataset",
     "costarica-small": "dataloaders.costa_rica_small.CostaRicaSmallLighting",
     "costarica-long-seq": "dataloaders.costa_rica_quantized.CostaRicaQuantizedLightning",
-    "costarica-bpe": "dataloaders.costa_rica_bpe.CostaRicaBPELightning"
+    "costarica-bpe": "dataloaders.costa_rica_bpe.CostaRicaBPELightning",
+    "costarica-enc-dec": "dataloaders.costa_rica_quantized.CostaRicaEncDecLightning",
 }
