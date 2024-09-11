@@ -105,10 +105,14 @@ class CostaRicaQuantized(Dataset):
         # normalize
         x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
         # quantize and encode data
-        encoded = quantize_encode(x_plus_one, self.bits)
+        if self.bits > 0:
+            encoded = quantize_encode(x_plus_one, self.bits)
 
-        x = encoded[:-1]
-        y = encoded[1:]
+            x = encoded[:-1]
+            y = encoded[1:]
+        else:
+            x = x_plus_one[:-1].float()
+            y = x_plus_one[1:].float()
 
         # end_time = time.time()
         # elapsed_time = end_time - start_time
@@ -145,7 +149,49 @@ class CostaRicaQuantizedLightning(SequenceDataset):
             bits=self.hparams.bits,
             train='test'
         )
-        #self.split_train_val(self.hparams.val_split)
+        # self.split_train_val(self.hparams.val_split)
+        self.num_classes = 2 ** self.dataset_train.bits
+
+
+class CostaRicaEncDec(CostaRicaQuantized):
+    def __init__(self, *args, **kwargs):
+        super(CostaRicaEncDec, self).__init__(*args, **kwargs)
+
+    def __getitem__(self, idx):
+        x, y = CostaRicaQuantized.__getitem__(self, idx)
+        return x, x
+
+
+class CostaRicaEncDecLightning(SequenceDataset):
+    def __init__(self, data_dir: str = None, **kwargs):
+        super().__init__(data_dir, **kwargs)
+        self.setup()
+
+    def setup(self):
+        self.d_data = 1
+
+        self.dataset_train = CostaRicaEncDec(
+            directory=self.data_dir,
+            sample_len=self.hparams.sample_len,
+            downsample=self.hparams.downsample,
+            bits=self.hparams.bits,
+            train='train'
+        )
+        self.dataset_val = CostaRicaEncDec(
+            directory=self.data_dir,
+            sample_len=self.hparams.sample_len,
+            downsample=self.hparams.downsample,
+            bits=self.hparams.bits,
+            train='val'
+        )
+        self.dataset_test = CostaRicaEncDec(
+            directory=self.data_dir,
+            sample_len=self.hparams.sample_len,
+            downsample=self.hparams.downsample,
+            bits=self.hparams.bits,
+            train='test'
+        )
+        # self.split_train_val(self.hparams.val_split)
         self.num_classes = 2 ** self.dataset_train.bits
 
 
@@ -177,21 +223,22 @@ def initialize_dataset_test():
 
 def simple_lightning_test():
     data_path = 'data/costa_rica/cove_rifo_15_16_hhz'
-    sample_len = 1048576
-    downsample = 100
+    sample_len = 1024
+    downsample = 1
+    bits = 0
 
     data_config = {
         'sample_len': sample_len,
         'val_split': 0.1,
         'downsample': downsample,
-        'bits': 8
+        'bits': bits
     }
     loader_config = {
-        'batch_size': 1,
+        'batch_size': 8,
         'shuffle': True,
     }
 
-    dataset = CostaRicaQuantizedLightning(data_dir=data_path, **data_config)
+    dataset = CostaRicaEncDecLightning(data_dir=data_path, **data_config)
     train_loader = dataset.train_dataloader(**loader_config)
     val_loader = dataset.val_dataloader(**loader_config)
     test_loader = dataset.test_dataloader(**loader_config)
@@ -217,8 +264,17 @@ def simple_lightning_test():
     plt.show()
 
     print(train_loader.dataset.tuples[0])
+    for i, (x, y) in enumerate(train_loader):
+        assert x.shape[1] == sample_len
+        assert y.shape[1] == sample_len
+    for i, (x, y) in enumerate(val_loader):
+        assert x.shape[1] == sample_len
+        assert y.shape[1] == sample_len
+    for i, (x, y) in enumerate(test_loader):
+        assert x.shape[1] == sample_len
+        assert y.shape[1] == sample_len
 
 
 if __name__ == '__main__':
-    #initialize_dataset_test()
+    # initialize_dataset_test()
     simple_lightning_test()
