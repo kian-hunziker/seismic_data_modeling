@@ -25,7 +25,7 @@ model:
   #   n_ssm: 1
 
 train:
-  ckpt_path: wandb_logs/MA/2024-08-09__17_37_48
+  ckpt_path: wandb_logs/MA/2024-09-06__16_06_55
   monitor: val/loss
   mode: min
 
@@ -43,7 +43,8 @@ scheduler:
   num_training_steps: 500
 
 trainer:
-  max_epochs: 40
+  max_steps: 60
+  max_epochs: 100
   log_every_n_steps: 1
 
 dataset:

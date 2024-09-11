@@ -1,0 +1,56 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: cr_enc_dec
+  - /task: classification
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: identity
+
+experiment_name: transformer_encoder_decoder_classification
+
+train:
+  #ckpt_path: wandb_logs/MA/2024-09-06__16_06_55
+  monitor: val/loss
+  mode: min
+
+encoder:
+  _name_: transformer
+  d_model: 64
+  seq_len: 1024
+  latent_dim: 64
+  regression: False
+  vocab_size: 256
+  nhead: 8
+  dim_feedforward: 128
+  num_layers: 8
+
+decoder:
+  _name_: transformer
+  d_model: 64
+  seq_len: 1024
+  latent_dim: 64
+  regression: False
+  vocab_size: 256
+  nhead: 8
+  dim_feedforward: 128
+  num_layers: 8
+
+loader:
+  batch_size: 4
+
+scheduler:
+  num_warmup_steps: 100
+  num_training_steps: 500
+
+trainer:
+  max_steps: 500
+  max_epochs: 100
+  log_every_n_steps: 1
+  gradient_clip_val: 1.0
+  precision: 32
+
+dataset:
+  sample_len: 1024
