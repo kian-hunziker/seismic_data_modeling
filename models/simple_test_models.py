@@ -5,6 +5,17 @@ import torch.nn.functional as F
 import os
 
 
+class IdentityModel(nn.Module):
+    def __init__(self):
+        super(IdentityModel, self).__init__()
+
+    def forward(self, x, state=None):
+        return x, None
+
+    def step(self, x, state=None):
+        return x, None
+
+
 class LinearTestModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
