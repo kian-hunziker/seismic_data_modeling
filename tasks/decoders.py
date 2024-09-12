@@ -6,6 +6,9 @@ from utils.config_utils import instantiate
 from dataloaders.base import SequenceDataset
 from tasks.positional_encoding import PositionalEncoding
 
+from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
+from models.sashimi.sashimi_standalone import UpPool, FFBlock, ResidualBlock
+
 
 class Decoder(nn.Module):
     def __init__(self, in_features, out_features):
@@ -83,10 +86,68 @@ class SigDecoder(nn.Module):
         return x
 
 
+class S4Decoder(nn.Module):
+    def __init__(self, d_model, n_blocks):
+        super(S4Decoder, self).__init__()
+        self.d_model = d_model
+        self.n_blocks = n_blocks
+        self.conv_t = nn.ConvTranspose1d(
+            in_channels=1,
+            out_channels=d_model,
+            kernel_size=16,
+            stride=16,
+            padding=0,
+        )
+        self.out_proj = nn.Linear(d_model, 1)
+
+        def s4_block(dim, bidirectional=False, dropout=0.0, **s4_args):
+            layer = S4(
+                d_model=dim,
+                d_state=64,
+                bidirectional=bidirectional,
+                dropout=dropout,
+                transposed=True,
+                **s4_args,
+            )
+            return ResidualBlock(
+                d_model=dim,
+                layer=layer,
+                dropout=dropout,
+            )
+
+        def ff_block(dim, ff=2, dropout=0.0):
+            layer = FFBlock(
+                d_model=dim,
+                expand=ff,
+                dropout=dropout,
+            )
+            return ResidualBlock(
+                d_model=dim,
+                layer=layer,
+                dropout=dropout,
+            )
+
+        blocks = []
+        for i in range(n_blocks):
+            blocks.append(s4_block(dim=d_model))
+            blocks.append(ff_block(dim=d_model))
+        self.blocks = nn.ModuleList(blocks)
+
+    def forward(self, x, state=None):
+        if x.dim == 3:
+            x = x.squeeze(-1)
+        x = self.conv_t(x.unsqueeze(1))
+        for block in self.blocks:
+            x, _ = block(x)
+        x = self.out_proj(x.transpose(1, 2))
+        return x
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
-    'transformer': SigDecoder
+    'transformer': SigDecoder,
+    's4-decoder': S4Decoder
 }
 
 
@@ -102,7 +163,7 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
         print('Please specify model to instantiate encoder')
         return None
 
-    if decoder._name_ == 'transformer':
+    if decoder._name_ == 'transformer' or decoder._name_ == 's4-decoder':
         obj = instantiate(dec_registry, decoder)
         return obj
 

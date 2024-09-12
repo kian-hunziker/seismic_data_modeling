@@ -6,6 +6,9 @@ from utils.config_utils import instantiate
 from dataloaders.base import SequenceDataset
 from tasks.positional_encoding import PositionalEncoding
 
+from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
+from models.sashimi.sashimi_standalone import UpPool, FFBlock, ResidualBlock
+
 
 class Encoder(nn.Module):
     def __init__(self, in_features, out_features):
@@ -122,6 +125,67 @@ class SigEncoder(nn.Module):
         return x
 
 
+class S4Encoder(nn.Module):
+    def __init__(self, d_model, n_blocks, bidirectional=False):
+        super(S4Encoder, self).__init__()
+        self.d_model = d_model
+        self.n_blocks = n_blocks
+        self.bidirectional = bidirectional
+
+        # self.input_linear = nn.Linear(1, d_model)
+        self.input_linear = nn.Conv1d(in_channels=1, out_channels=d_model, kernel_size=5, stride=1, padding=2)
+
+        def s4_block(dim, bidirectional=False, dropout=0.0, **s4_args):
+            layer = S4(
+                d_model=dim,
+                d_state=64,
+                bidirectional=bidirectional,
+                dropout=dropout,
+                transposed=True,
+                **s4_args,
+            )
+            return ResidualBlock(
+                d_model=dim,
+                layer=layer,
+                dropout=dropout,
+            )
+
+        def ff_block(dim, ff=2, dropout=0.0):
+            layer = FFBlock(
+                d_model=dim,
+                expand=ff,
+                dropout=dropout,
+            )
+            return ResidualBlock(
+                d_model=dim,
+                layer=layer,
+                dropout=dropout,
+            )
+
+        blocks = []
+        for i in range(n_blocks):
+            blocks.append(s4_block(dim=d_model))
+            blocks.append(ff_block(dim=d_model))
+
+        self.blocks = nn.ModuleList(blocks)
+
+    def _forward(self, x):
+        x = x.transpose(1, 2)
+        x = self.input_linear(x)
+        for block in self.blocks:
+            x, _ = block(x)
+        return x[:, :, -1]
+
+    def forward(self, x, state=None):
+        if self.bidirectional:
+            x_rev = torch.flip(x, dims=[1])
+            out_forward = self._forward(x)
+            out_rev = self._forward(x_rev)
+            return out_forward + out_rev
+        else:
+            return self._forward(x)
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
@@ -129,6 +193,7 @@ enc_registry = {
     'mlp': MLPEncoder,
     'embedding': EmbeddingEncoder,
     'transformer': SigEncoder,
+    's4-encoder': S4Encoder
 }
 
 
@@ -144,13 +209,12 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
         print('Please specify model to instantiate encoder')
         return None
 
-    if encoder._name_ == 'transformer':
+    if encoder._name_ == 'transformer' or encoder._name_ == 's4-encoder':
         obj = instantiate(enc_registry, encoder)
         return obj
 
     in_features = dataset.d_data
     out_features = model.d_model
-
 
     if dataset.num_classes is not None:
         obj = instantiate(
