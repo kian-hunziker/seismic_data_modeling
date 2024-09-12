@@ -186,6 +186,23 @@ class S4Encoder(nn.Module):
             return self._forward(x)
 
 
+class DownPoolEncoder(nn.Module):
+    def __init__(self, hidden_dim, pool=16):
+        super(DownPoolEncoder, self).__init__()
+        self.pool = pool
+
+        self.linear1 = nn.Linear(pool, hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, 1)
+        # self.out_proj = nn.Linear(64 * pool, out_channels)
+
+    def forward(self, x, state=None):
+        x = x.reshape(x.shape[0], -1, self.pool)
+        x = F.relu(self.linear1(x))
+        x = self.linear2(x)
+        # x = self.out_proj(x.flatten(1, -1))
+        return x.squeeze(-1)
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
@@ -193,7 +210,8 @@ enc_registry = {
     'mlp': MLPEncoder,
     'embedding': EmbeddingEncoder,
     'transformer': SigEncoder,
-    's4-encoder': S4Encoder
+    's4-encoder': S4Encoder,
+    'pool': DownPoolEncoder,
 }
 
 
@@ -209,7 +227,7 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
         print('Please specify model to instantiate encoder')
         return None
 
-    if encoder._name_ == 'transformer' or encoder._name_ == 's4-encoder':
+    if encoder._name_ == 'transformer' or encoder._name_ == 's4-encoder' or encoder._name_ == 'pool':
         obj = instantiate(enc_registry, encoder)
         return obj
 

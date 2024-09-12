@@ -143,11 +143,34 @@ class S4Decoder(nn.Module):
         return x
 
 
+class UpPoolDecoder(nn.Module):
+    def __init__(self, d_model, pool):
+        super(UpPoolDecoder, self).__init__()
+        self.d_model = d_model
+        self.pool = pool
+        self.conv_t = nn.ConvTranspose1d(
+            in_channels=1,
+            out_channels=d_model,
+            kernel_size=self.pool,
+            stride=self.pool,
+            padding=0,
+        )
+        self.out_proj = nn.Linear(d_model, 1)
+
+    def forward(self, x, state=None):
+        if x.dim == 3:
+            x = x.squeeze(-1)
+        x = self.conv_t(x.unsqueeze(1))
+        x = self.out_proj(x.transpose(1, 2))
+        return x
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
     'transformer': SigDecoder,
-    's4-decoder': S4Decoder
+    's4-decoder': S4Decoder,
+    'pool': UpPoolDecoder,
 }
 
 
@@ -163,7 +186,7 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
         print('Please specify model to instantiate encoder')
         return None
 
-    if decoder._name_ == 'transformer' or decoder._name_ == 's4-decoder':
+    if decoder._name_ == 'transformer' or decoder._name_ == 's4-decoder' or decoder._name_ == 'pool':
         obj = instantiate(dec_registry, decoder)
         return obj
 
