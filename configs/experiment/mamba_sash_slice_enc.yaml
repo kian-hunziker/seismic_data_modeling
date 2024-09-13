@@ -1,0 +1,59 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: cr_small_long_seq
+  - /task: regression
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: mamba_sashimi
+
+experiment_name: mamba_cr_slice
+
+model:
+  d_model: 64
+  n_layers: 5
+  expand: 2
+  ff: 2
+  pool:
+    - 16
+    - 16
+  dropout: 0.0
+  unet: False
+  complex: True
+
+train:
+  monitor: val/loss
+  mode: min
+
+task:
+  metrics:
+    - log_mse
+    - mse
+
+dataset:
+  data_dir: dataloaders/data/costa_rica/cove_rifo_15_16_hhz
+  sample_len: 67108864
+  downsample: 1
+  bits: 0
+
+encoder:
+  _name_: pool
+  pretrained: True
+  path: pretrained_encoders_decoders/2024-09-12__15_26_10/encoder
+
+decoder:
+  _name_: dummy
+
+loader:
+  batch_size: 4
+
+scheduler:
+  num_warmup_steps: 10000
+  num_training_steps: 100000
+
+trainer:
+  max_steps: 100000
+  max_epochs: 100000
+  gradient_clip_val: 1.0
