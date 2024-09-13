@@ -21,8 +21,8 @@ import matplotlib.pyplot as plt
 from dataloaders.MNISTdataloader import MNISTdataset
 from dataloaders.simple_waveform import SineWaveLightningDataset
 from models.simple_test_models import ConvNet
-from tasks.encoders import instantiate_encoder
-from tasks.decoders import instantiate_decoder
+from tasks.encoders import instantiate_encoder, load_encoder_from_file
+from tasks.decoders import instantiate_decoder, load_decoder_from_file
 from tasks.task import task_registry
 
 from utils.config_utils import instantiate
@@ -34,33 +34,36 @@ class LightningSequenceModel(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.save_hyperparameters(config)
-
-        # initialize dataset:
-        self.dataset = instantiate(registry.dataset, self.hparams.dataset)
-        '''
-        if self.hparams.dataset._name_ == "mnist":
-            self.dataset = MNISTdataset(data_dir='dataloaders/data', **self.hparams.dataset)
-        elif self.hparams.dataset._name_ == "sine":
-            self.dataset = SineWaveLightningDataset(
-                data_dir='dataloaders/data/basic_waveforms/sine_waveform.npy',
-                **self.hparams.dataset,
-            )
+        if config.encoder.get("pretrained", None) is not None:
+            self.use_pretrained_encoder = config.encoder.get("pretrained")
         else:
-            print(f"Unknown dataset name: {self.hparams.dataset._name_}")
-            self.dataset = None
-        '''
+            self.use_pretrained_encoder = False
+        if config.decoder.get("pretrained", None) is not None:
+            self.use_pretrained_decoder = config.decoder.get("pretrained")
+        else:
+            self.use_pretrained_decoder = False
+
+            # initialize dataset:
+        self.dataset = instantiate(registry.dataset, self.hparams.dataset)
+
         self.setup()
 
     def setup(self, stage=None):
         self.model = instantiate(registry.model, self.hparams.model)
 
-        self.encoder = instantiate_encoder(self.hparams.encoder, self.dataset, self.model)
-        '''LayerNormClassEncoder(
-            in_features=1,
-            out_features=self.hparams.model.d_model,
-            num_classes=256
-        )'''
-        self.decoder = instantiate_decoder(self.hparams.decoder, self.dataset, self.model)
+        if not self.use_pretrained_encoder:
+            self.encoder = instantiate_encoder(self.hparams.encoder, self.dataset, self.model)
+        else:
+            encoder_path = self.hparams.encoder.path
+            print(f'\nLoading Encoder from {encoder_path}\n')
+            self.encoder, encoder_hparams = load_encoder_from_file(encoder_path, self.dataset, self.model)
+
+        if not self.use_pretrained_decoder:
+            self.decoder = instantiate_decoder(self.hparams.decoder, self.dataset, self.model)
+        else:
+            decoder_path = self.hparams.decoder.path
+            print(f'\nLoading Decoder from {decoder_path}\n')
+            self.decoder, decoder_hparams = load_decoder_from_file(decoder_path, self.dataset, self.model)
 
         # if self.hparams.model._name_ == "conv_net":
         #    self.model = ConvNet(self.hparams.model.in_channels, self.hparams.model.img_size)
@@ -80,10 +83,24 @@ class LightningSequenceModel(pl.LightningModule):
 
     def forward(self, batch, batch_idx):
         x, y = batch
-        x = self.encoder(x)
+
+        # encode
+        if self.use_pretrained_encoder:
+            with torch.no_grad():
+                x, y = self.encoder.prepare_data(x, y)
+        else:
+            x = self.encoder(x)
+
+        # forward pass
         x, state = self.model(x, state=self._state)
         self._state = state
-        x = self.decoder(x, state=state)
+
+        # decode
+        if self.use_pretrained_decoder:
+            with torch.no_grad():
+                x = self.decoder(x, state=state)
+        else:
+            x = self.decoder(x, state=state)
         return x, y
 
     def step(self, x_t):

@@ -9,6 +9,8 @@ from tasks.positional_encoding import PositionalEncoding
 from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
 from models.sashimi.sashimi_standalone import UpPool, FFBlock, ResidualBlock
 
+from omegaconf import OmegaConf
+
 
 class Encoder(nn.Module):
     def __init__(self, in_features, out_features):
@@ -125,6 +127,35 @@ class SigEncoder(nn.Module):
         return x
 
 
+def s4_block(dim, bidirectional=False, dropout=0.0, **s4_args):
+    layer = S4(
+        d_model=dim,
+        d_state=64,
+        bidirectional=bidirectional,
+        dropout=dropout,
+        transposed=True,
+        **s4_args,
+    )
+    return ResidualBlock(
+        d_model=dim,
+        layer=layer,
+        dropout=dropout,
+    )
+
+
+def ff_block(dim, ff=2, dropout=0.0):
+    layer = FFBlock(
+        d_model=dim,
+        expand=ff,
+        dropout=dropout,
+    )
+    return ResidualBlock(
+        d_model=dim,
+        layer=layer,
+        dropout=dropout,
+    )
+
+
 class S4Encoder(nn.Module):
     def __init__(self, d_model, n_blocks, bidirectional=False):
         super(S4Encoder, self).__init__()
@@ -134,33 +165,6 @@ class S4Encoder(nn.Module):
 
         # self.input_linear = nn.Linear(1, d_model)
         self.input_linear = nn.Conv1d(in_channels=1, out_channels=d_model, kernel_size=5, stride=1, padding=2)
-
-        def s4_block(dim, bidirectional=False, dropout=0.0, **s4_args):
-            layer = S4(
-                d_model=dim,
-                d_state=64,
-                bidirectional=bidirectional,
-                dropout=dropout,
-                transposed=True,
-                **s4_args,
-            )
-            return ResidualBlock(
-                d_model=dim,
-                layer=layer,
-                dropout=dropout,
-            )
-
-        def ff_block(dim, ff=2, dropout=0.0):
-            layer = FFBlock(
-                d_model=dim,
-                expand=ff,
-                dropout=dropout,
-            )
-            return ResidualBlock(
-                d_model=dim,
-                layer=layer,
-                dropout=dropout,
-            )
 
         blocks = []
         for i in range(n_blocks):
@@ -187,20 +191,45 @@ class S4Encoder(nn.Module):
 
 
 class DownPoolEncoder(nn.Module):
-    def __init__(self, hidden_dim, pool=16):
+    def __init__(self, hidden_dim, pool=16, n_blocks=0):
         super(DownPoolEncoder, self).__init__()
         self.pool = pool
+        self.n_blocks = n_blocks
 
         self.linear1 = nn.Linear(pool, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, 1)
+
         # self.out_proj = nn.Linear(64 * pool, out_channels)
+
+        if self.n_blocks > 0:
+            blocks = []
+            for i in range(n_blocks):
+                blocks.append(s4_block(dim=hidden_dim))
+                blocks.append(ff_block(dim=hidden_dim))
+
+            self.blocks = nn.ModuleList(blocks)
 
     def forward(self, x, state=None):
         x = x.reshape(x.shape[0], -1, self.pool)
         x = F.relu(self.linear1(x))
+        if self.n_blocks > 0:
+            x = x.transpose(1, 2)
+            for block in self.blocks:
+                x, _ = block(x)
+            x = x.transpose(1, 2)
         x = self.linear2(x)
         # x = self.out_proj(x.flatten(1, -1))
         return x.squeeze(-1)
+
+    def prepare_data(self, x, y):
+        batch_size = x.shape[0]
+        sample_len = x.shape[1]
+        # TODO make sample len variable
+        x = x.reshape(-1, 1024, x.shape[-1])
+        y = y.reshape(-1, 1024, y.shape[-1])
+        x = self.forward(x)
+        y = self.forward(y)
+        return x.reshape(batch_size, -1, 64), y.reshape(batch_size, -1, 64)
 
 
 enc_registry = {
@@ -219,6 +248,10 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
     if encoder is None:
         return None
 
+    if encoder._name_ == 'transformer' or encoder._name_ == 's4-encoder' or encoder._name_ == 'pool':
+        obj = instantiate(enc_registry, encoder)
+        return obj
+
     if dataset is None:
         print('Please specify dataset to instantiate encoder')
         return None
@@ -226,10 +259,6 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
     if model is None:
         print('Please specify model to instantiate encoder')
         return None
-
-    if encoder._name_ == 'transformer' or encoder._name_ == 's4-encoder' or encoder._name_ == 'pool':
-        obj = instantiate(enc_registry, encoder)
-        return obj
 
     in_features = dataset.d_data
     out_features = model.d_model
@@ -251,3 +280,16 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
         )
 
     return obj
+
+
+def load_encoder_from_file(encoder_file, dataset: SequenceDataset = None, model=None):
+    encoder_state_dict, hparams = torch.load(encoder_file, weights_only=False)
+    enc_config = OmegaConf.create(hparams['encoder'])
+    encoder = instantiate_encoder(enc_config, dataset=dataset, model=model)
+    encoder.load_state_dict(encoder_state_dict)
+
+    # freeze parameters
+    encoder.eval()
+    for param in encoder.parameters():
+        param.requires_grad = False
+    return encoder, hparams

@@ -9,6 +9,8 @@ from tasks.positional_encoding import PositionalEncoding
 from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
 from models.sashimi.sashimi_standalone import UpPool, FFBlock, ResidualBlock
 
+from omegaconf import OmegaConf
+
 
 class Decoder(nn.Module):
     def __init__(self, in_features, out_features):
@@ -87,10 +89,12 @@ class SigDecoder(nn.Module):
 
 
 class S4Decoder(nn.Module):
-    def __init__(self, d_model, n_blocks):
+    def __init__(self, d_model, n_blocks, bidirectional=False):
         super(S4Decoder, self).__init__()
         self.d_model = d_model
         self.n_blocks = n_blocks
+        self.bidirectional = bidirectional
+
         self.conv_t = nn.ConvTranspose1d(
             in_channels=1,
             out_channels=d_model,
@@ -133,7 +137,7 @@ class S4Decoder(nn.Module):
             blocks.append(ff_block(dim=d_model))
         self.blocks = nn.ModuleList(blocks)
 
-    def forward(self, x, state=None):
+    def _forward(self, x, state=None):
         if x.dim == 3:
             x = x.squeeze(-1)
         x = self.conv_t(x.unsqueeze(1))
@@ -141,6 +145,15 @@ class S4Decoder(nn.Module):
             x, _ = block(x)
         x = self.out_proj(x.transpose(1, 2))
         return x
+
+    def forward(self, x, state=None):
+        if self.bidirectional:
+            x_rev = torch.flip(x, dims=[1])
+            out_forward = self._forward(x)
+            out_rev = self._forward(x_rev)
+            return out_forward + out_rev
+        else:
+            return self._forward(x)
 
 
 class UpPoolDecoder(nn.Module):
@@ -178,6 +191,10 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
     if decoder is None:
         return None
 
+    if decoder._name_ == 'transformer' or decoder._name_ == 's4-decoder' or decoder._name_ == 'pool':
+        obj = instantiate(dec_registry, decoder)
+        return obj
+
     if dataset is None:
         print('Please specify dataset to instantiate encoder')
         return None
@@ -185,10 +202,6 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
     if model is None:
         print('Please specify model to instantiate encoder')
         return None
-
-    if decoder._name_ == 'transformer' or decoder._name_ == 's4-decoder' or decoder._name_ == 'pool':
-        obj = instantiate(dec_registry, decoder)
-        return obj
 
     in_features = model.d_model
     if dataset.num_classes is not None:
@@ -199,3 +212,16 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
     obj = instantiate(dec_registry, decoder, in_features=in_features, out_features=out_features)
 
     return obj
+
+
+def load_decoder_from_file(decoder_file, dataset: SequenceDataset = None, model=None):
+    decoder_state_dict, hparams = torch.load(decoder_file, weights_only=False)
+    dec_config = OmegaConf.create(hparams['decoder'])
+    decoder = instantiate_decoder(dec_config, dataset=dataset, model=model)
+    decoder.load_state_dict(decoder_state_dict)
+
+    # freeze parameters
+    decoder.eval()
+    for param in decoder.parameters():
+        param.requires_grad = False
+    return decoder, hparams
