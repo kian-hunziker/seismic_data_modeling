@@ -4,6 +4,9 @@
 ## Data
 dataloaders/data/*
 
+## Pretrained Encoders and Decoders
+pretrained_encoders_decoders/*
+
 ## logs
 lightning_logs/*
 outputs/*
