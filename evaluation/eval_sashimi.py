@@ -12,6 +12,7 @@ from evaluation.multiclass_sampling import greedy_prediction, multinomial_predic
 from evaluation.multiclass_sampling import top_k_top_p_filtering
 from models.sashimi.sashimi_standalone import Sashimi
 from evaluation.eval_utils import load_checkpoint, get_pipeline_components
+from dataloaders.data_utils.costa_rica_utils import find_data_min_and_max
 import matplotlib.pyplot as plt
 
 
@@ -45,15 +46,22 @@ def moving_average(signal: torch.Tensor | np.ndarray, window_size: int = 10) -> 
     return moving_avg
 
 
-def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8):
-    data_min = -np.sqrt(783285)
-    data_max = np.sqrt(783285)
+def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8, d_max: int = None):
+    if d_max is None:
+        data_max = torch.max(data)
+        data_min = torch.min(data)
+        data_max = np.sqrt(max(abs(data_max), abs(data_min)))
+        data_min = -data_max
+    else:
+        data_max = d_max
+        data_min = -d_max
 
     data = decimate(data, q=downsample)
     data = torch.from_numpy(data.copy()).float()
     data = torch.sqrt(torch.abs(data)) * torch.sign(data)
     data = normalize_11_torch(data, d_min=data_min, d_max=data_max)
-    data = quantize_encode(data, bits=bits)
+    if bits > 0:
+        data = quantize_encode(data, bits=bits)
     return data
 
 
