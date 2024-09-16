@@ -36,7 +36,8 @@ class CostaRicaQuantized(Dataset):
         self.seq_len = (sample_len * downsample) // 8_640_000 + 1
 
         # extract data range and compute sqrt
-        if self.directory == 'dataloaders/data/costa_rica/cove_rifo_15_16_hhz':
+        if str(self.directory) == 'dataloaders/data/costa_rica/cove_rifo_15_16_hhz':
+            print('Use precomputed data_max')
             self.data_max = 2431.3677220856575
         else:
             d_min, d_max = cu.find_data_min_and_max(self.directory)
