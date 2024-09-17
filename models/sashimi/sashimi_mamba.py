@@ -281,6 +281,7 @@ class MambaSashimi(nn.Module):
             dropout=0.0,
             complex=False,
             simple_up_down=False,
+            d_conv=4,
             **s4_args,
     ):
         """
@@ -308,6 +309,7 @@ class MambaSashimi(nn.Module):
         super().__init__()
         self.d_model = H = d_model
         self.d_output = H
+        self.d_conv = d_conv
         self.unet = unet
         self.complex = complex
 
@@ -316,8 +318,15 @@ class MambaSashimi(nn.Module):
             dt_rank = math.ceil(dim / 16)
             if self.complex and dt_rank % 2 != 0:
                 dt_rank += 1
-            mixer_cls = partial(MambaComplex, d_state=64, d_conv=4, expand=2, layer_idx=layer_idx, complex=self.complex,
-                                dt_rank=dt_rank)
+            mixer_cls = partial(
+                MambaComplex,
+                d_state=64,
+                d_conv=self.d_conv,
+                expand=2,
+                layer_idx=layer_idx,
+                complex=self.complex,
+                dt_rank=dt_rank
+            )
             norm_cls = partial(RMSNorm, eps=1e-5)
             mlp_cls = nn.Identity
             block = Block(
