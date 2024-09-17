@@ -21,6 +21,7 @@ class CostaRicaQuantized(Dataset):
             sample_len: int = 2048,
             downsample: int = 1,
             bits: int = 8,
+            normalize_per_slice: bool = False,
             train: str = 'train'
     ):
         super().__init__()
@@ -29,6 +30,7 @@ class CostaRicaQuantized(Dataset):
         self.sample_len = sample_len
         self.file_paths = glob.glob(os.path.join(self.directory, "*.pt"))
         self.downsample = downsample
+        self.normalize_per_slice = normalize_per_slice
         self.bits = int(bits)
         self.train = train
 
@@ -36,13 +38,14 @@ class CostaRicaQuantized(Dataset):
         self.seq_len = (sample_len * downsample) // 8_640_000 + 1
 
         # extract data range and compute sqrt
-        if str(self.directory) == 'dataloaders/data/costa_rica/cove_rifo_15_16_hhz':
-            print('Use precomputed data_max')
-            self.data_max = 2431.3677220856575
-        else:
-            d_min, d_max = cu.find_data_min_and_max(self.directory)
-            self.data_max = np.sqrt(max(abs(d_min), abs(d_max)))
-        self.data_min = -self.data_max
+        if not self.normalize_per_slice:
+            if str(self.directory) == 'dataloaders/data/costa_rica/cove_rifo_15_16_hhz':
+                print('Use precomputed data_max')
+                self.data_max = 2431.3677220856575
+            else:
+                d_min, d_max = cu.find_data_min_and_max(self.directory)
+                self.data_max = np.sqrt(max(abs(d_min), abs(d_max)))
+            self.data_min = -self.data_max
 
         # extract metadata and sequences
         metadata = [cu.get_metadata(f) for f in self.file_paths]
@@ -107,7 +110,10 @@ class CostaRicaQuantized(Dataset):
         # squash data
         x_plus_one = torch.sqrt(torch.abs(x_plus_one)) * torch.sign(x_plus_one)
         # normalize
-        x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
+        if self.normalize_per_slice:
+            x_plus_one = normalize_11_torch(x_plus_one)
+        else:
+            x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
         # quantize and encode data
         if self.bits > 0:
             encoded = quantize_encode(x_plus_one, self.bits)
