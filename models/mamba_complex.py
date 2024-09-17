@@ -175,7 +175,7 @@ class MambaComplex(nn.Module):
             A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
 
         # In the backward pass we write dx and dz next to each other to avoid torch.cat
-        if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None:  # Doesn't support outputting the states
+        if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None and self.d_conv <= 4:  # Doesn't support outputting the states
             out = mamba_inner_fn(
                 xz,
                 self.conv1d.weight,
@@ -198,7 +198,7 @@ class MambaComplex(nn.Module):
                 # If we just take x[:, :, -self.d_conv :], it will error if seqlen < self.d_conv
                 # Instead F.pad will pad with zeros if seqlen < self.d_conv, and truncate otherwise.
                 conv_state.copy_(F.pad(x, (self.d_conv - x.shape[-1], 0)))  # Update state (B D W)
-            if causal_conv1d_fn is None:
+            if causal_conv1d_fn is None or self.d_conv > 4:
                 x = self.act(self.conv1d(x)[..., :seqlen])
             else:
                 assert self.activation in ["silu", "swish"]
@@ -260,7 +260,7 @@ class MambaComplex(nn.Module):
         x, z = xz.chunk(2, dim=-1)  # (B D)
 
         # Conv step
-        if causal_conv1d_update is None:
+        if causal_conv1d_update is None or self.d_conv > 4:
             conv_state.copy_(torch.roll(conv_state, shifts=-1, dims=-1))  # Update state (B D W)
             conv_state[:, :, -1] = x
             x = torch.sum(conv_state * rearrange(self.conv1d.weight, "d 1 w -> d w"), dim=-1)  # (B D)
