@@ -138,12 +138,17 @@ class CostaRicaQuantizedLightning(SequenceDataset):
     def setup(self):
         self.d_data = 1
 
+        try:
+            normalize_per_slice = self.hparams.normalize_per_slice
+        except:
+            normalize_per_slice = False
+
         self.dataset_train = CostaRicaQuantized(
             directory=self.data_dir,
             sample_len=self.hparams.sample_len,
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
-            normalize_per_slice=self.hparams.normalize_per_slice,
+            normalize_per_slice=normalize_per_slice,
             train='train'
         )
         self.dataset_val = CostaRicaQuantized(
@@ -151,7 +156,7 @@ class CostaRicaQuantizedLightning(SequenceDataset):
             sample_len=self.hparams.sample_len,
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
-            normalize_per_slice=self.hparams.normalize_per_slice,
+            normalize_per_slice=normalize_per_slice,
             train='val'
         )
         self.dataset_test = CostaRicaQuantized(
@@ -159,7 +164,7 @@ class CostaRicaQuantizedLightning(SequenceDataset):
             sample_len=int(8600000 / self.hparams.downsample),
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
-            normalize_per_slice=self.hparams.normalize_per_slice,
+            normalize_per_slice=normalize_per_slice,
             train='test'
         )
         # self.split_train_val(self.hparams.val_split)
