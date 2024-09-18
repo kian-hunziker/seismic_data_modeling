@@ -24,6 +24,8 @@ from models.simple_test_models import ConvNet
 from tasks.encoders import instantiate_encoder, load_encoder_from_file
 from tasks.decoders import instantiate_decoder, load_decoder_from_file
 from tasks.task import task_registry
+from dataloaders.base import SeisbenchDataLit
+
 
 from utils.config_utils import instantiate
 from utils import registry
@@ -82,7 +84,11 @@ class LightningSequenceModel(pl.LightningModule):
         self._initialize_state()
 
     def forward(self, batch, batch_idx):
-        x, y = batch
+        if isinstance(self.dataset, SeisbenchDataLit):
+            x = batch['X']
+            y = batch['y']
+        else:
+            x, y = batch
 
         # encode
         if self.use_pretrained_encoder:
@@ -280,7 +286,10 @@ def plot_and_save_training_examples(model: LightningSequenceModel, trainer: pl.T
     else:
         print(f"Directory 'training_examples' already exists at {save_dir}")
 
-    x, _ = next(iter(model.dataset.train_dataloader(batch_size=num_examples)))
+    if isinstance(model.dataset, SeisbenchDataLit):
+        x = next(iter(model.dataset.train_dataloader(batch_size=num_examples)))['X']
+    else:
+        x, _ = next(iter(model.dataset.train_dataloader(batch_size=num_examples)))
 
     for i in range(x.shape[0]):
         fig, ax = plt.subplots(figsize=(40, 10))

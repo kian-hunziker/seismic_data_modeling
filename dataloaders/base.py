@@ -54,3 +54,32 @@ class SequenceDataset(pl.LightningDataModule):
         return self._dataloader(self.dataset_test, **kwargs)
 
 
+class SeisbenchDataLit(pl.LightningDataModule):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.save_hyperparameters()
+
+        self.dataset_train = self.dataset_val = self.dataset_test = None
+
+        self.d_data = 1
+        self.num_classes = None
+
+        self.init()
+
+    def init(self):
+        pass
+
+    def setup(self):
+        pass
+
+    def _dataloader(self, dataset, **kwargs):
+        return torch.utils.data.DataLoader(dataset, **kwargs)
+
+    def train_dataloader(self, **kwargs):
+        return self._dataloader(self.dataset_train, **kwargs)
+
+    def val_dataloader(self, **kwargs):
+        return self._dataloader(self.dataset_val, **kwargs)
+
+    def test_dataloader(self, **kwargs):
+        return self._dataloader(self.dataset_test, **kwargs)
