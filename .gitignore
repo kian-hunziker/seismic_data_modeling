@@ -4,6 +4,9 @@
 ## Data
 dataloaders/data/*
 
+## jupyter notebooks
+notebooks/*
+
 ## Pretrained Encoders and Decoders
 pretrained_encoders_decoders/*
 
