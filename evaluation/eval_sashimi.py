@@ -46,7 +46,7 @@ def moving_average(signal: torch.Tensor | np.ndarray, window_size: int = 10) -> 
     return moving_avg
 
 
-def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8, d_max: int = None):
+def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8, d_max: int = None, moving_average: int = 31):
     if d_max is None:
         data_max = torch.max(data)
         data_min = torch.min(data)
@@ -60,6 +60,8 @@ def prepare_data(data: torch.Tensor, downsample: int = 100, bits: int = 8, d_max
     data = torch.from_numpy(data.copy()).float()
     data = torch.sqrt(torch.abs(data)) * torch.sign(data)
     data = normalize_11_torch(data, d_min=data_min, d_max=data_max)
+    if moving_average > 1:
+        data = moving_average(data, moving_average).squeeze()
     if bits > 0:
         data = quantize_encode(data, bits=bits)
     return data
