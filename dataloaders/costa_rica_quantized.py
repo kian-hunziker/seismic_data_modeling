@@ -10,6 +10,7 @@ import dataloaders.data_utils.costa_rica_utils as cu
 from scipy.signal import decimate
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SequenceDataset
+from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
 
@@ -22,6 +23,8 @@ class CostaRicaQuantized(Dataset):
             downsample: int = 1,
             bits: int = 8,
             normalize_per_slice: bool = False,
+            moving_average: bool = False,
+            avg_window: int = 16,
             train: str = 'train'
     ):
         super().__init__()
@@ -31,6 +34,8 @@ class CostaRicaQuantized(Dataset):
         self.file_paths = glob.glob(os.path.join(self.directory, "*.pt"))
         self.downsample = downsample
         self.normalize_per_slice = normalize_per_slice
+        self.moving_average = moving_average
+        self.avg_window = avg_window
         self.bits = int(bits)
         self.train = train
 
@@ -114,6 +119,10 @@ class CostaRicaQuantized(Dataset):
             x_plus_one = normalize_11_torch(x_plus_one)
         else:
             x_plus_one = normalize_11_torch(x_plus_one, d_min=self.data_min, d_max=self.data_max)
+
+        if self.moving_average:
+            x_plus_one = moving_average(x_plus_one, self.avg_window).squeeze()
+
         # quantize and encode data
         if self.bits > 0:
             encoded = quantize_encode(x_plus_one, self.bits)
@@ -143,12 +152,21 @@ class CostaRicaQuantizedLightning(SequenceDataset):
         except:
             normalize_per_slice = False
 
+        try:
+            moving_average = self.hparams.moving_average
+            avg_window = self.hparams.avg_window
+        except:
+            moving_average = False
+            avg_window = 0
+
         self.dataset_train = CostaRicaQuantized(
             directory=self.data_dir,
             sample_len=self.hparams.sample_len,
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
             normalize_per_slice=normalize_per_slice,
+            moving_average=moving_average,
+            avg_window=avg_window,
             train='train'
         )
         self.dataset_val = CostaRicaQuantized(
@@ -157,6 +175,8 @@ class CostaRicaQuantizedLightning(SequenceDataset):
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
             normalize_per_slice=normalize_per_slice,
+            moving_average=moving_average,
+            avg_window=avg_window,
             train='val'
         )
         self.dataset_test = CostaRicaQuantized(
@@ -165,6 +185,8 @@ class CostaRicaQuantizedLightning(SequenceDataset):
             downsample=self.hparams.downsample,
             bits=self.hparams.bits,
             normalize_per_slice=normalize_per_slice,
+            moving_average=moving_average,
+            avg_window=avg_window,
             train='test'
         )
         # self.split_train_val(self.hparams.val_split)
@@ -240,23 +262,25 @@ def initialize_dataset_test():
 
 
 def simple_lightning_test():
-    data_path = 'data/costa_rica/cove_rifo_15_16_hhz'
-    sample_len = 1024
-    downsample = 1
-    bits = 0
+    data_path = 'data/costa_rica/small_subset'
+    sample_len = 400000
+    downsample = 100
+    bits = 8
 
     data_config = {
         'sample_len': sample_len,
         'val_split': 0.1,
         'downsample': downsample,
-        'bits': bits
+        'bits': bits,
+        'moving_average': True,
+        'avg_window': 31,
     }
     loader_config = {
-        'batch_size': 8,
-        'shuffle': True,
+        'batch_size': 1,
+        'shuffle': False,
     }
 
-    dataset = CostaRicaEncDecLightning(data_dir=data_path, **data_config)
+    dataset = CostaRicaQuantizedLightning(data_dir=data_path, **data_config)
     train_loader = dataset.train_dataloader(**loader_config)
     val_loader = dataset.val_dataloader(**loader_config)
     test_loader = dataset.test_dataloader(**loader_config)
@@ -269,7 +293,8 @@ def simple_lightning_test():
     print(f'x_val shape: {x_val.shape}')
     print(f'x_test shape: {x_test.shape}')
 
-    plt.plot(x_train[0].cpu().detach().numpy())
+    fig, ax = plt.subplots(figsize=(20, 5))
+    ax.plot(x_train[0].cpu().detach().numpy())
     plt.title("Training example lightning")
     plt.show()
 
@@ -289,8 +314,8 @@ def simple_lightning_test():
         assert x.shape[1] == sample_len
         assert y.shape[1] == sample_len
     for i, (x, y) in enumerate(test_loader):
-        assert x.shape[1] == sample_len
-        assert y.shape[1] == sample_len
+        assert x.shape[1] == int(8600000 / downsample)
+        assert y.shape[1] == int(8600000 / downsample)
 
 
 if __name__ == '__main__':
