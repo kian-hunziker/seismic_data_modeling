@@ -1,0 +1,50 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: seisbench_auto_reg
+  - /task: classification
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: sashimi #mamba_sashimi
+
+experiment_name: mamba_seisbench_auto_reg
+
+model:
+  d_model: 64
+  n_layers: 5
+  expand: 2
+  ff: 2
+  pool:
+    - 4
+    - 4
+  dropout: 0.0
+  unet: False
+  #complex: True
+
+train:
+  monitor: val/loss
+  mode: min
+
+dataset:
+  sample_len: 1024
+  bits: 8
+
+encoder:
+  _name_: embedding
+
+decoder:
+  _name_: linear
+
+loader:
+  batch_size: 1
+
+scheduler:
+  num_warmup_steps: 100
+  num_training_steps: 10000
+
+trainer:
+  max_steps: 10000
+  max_epochs: 10000
+  gradient_clip_val: 1.0
