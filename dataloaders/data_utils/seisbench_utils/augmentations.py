@@ -12,10 +12,11 @@ class QuantizeAugmentation:
         self.bits = bits
 
     def __call__(self, state_dict):
-        x, metadata = state_dict[self.key[0]]
-        x = quantize_encode(torch.from_numpy(x), bits=self.bits)
-        x = x.numpy()
-        state_dict[self.key[1]] = (x, metadata)
+        if self.bits > 0:
+            x, metadata = state_dict[self.key[0]]
+            x = quantize_encode(torch.from_numpy(x), bits=self.bits)
+            x = x.numpy()
+            state_dict[self.key[1]] = (x, metadata)
 
 
 class FillMissingComponents:
