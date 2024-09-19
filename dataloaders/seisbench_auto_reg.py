@@ -10,7 +10,8 @@ import dataloaders.data_utils.costa_rica_utils as cu
 from scipy.signal import decimate
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
-from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, FillMissingComponents, AutoregressiveShift, TransposeLabels
+from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
+    FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -43,10 +44,12 @@ phase_dict = {
     "trace_Sn_arrival_sample": "S",
 }
 
+
 class SeisBenchAutoReg(SeisbenchDataLit):
-    def __init__(self, sample_len: int = 2048, bits: int = 8, **kwargs):
+    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
+        self.d_data = d_data
         self.bits = bits
         self.setup()
 
@@ -55,17 +58,21 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         train, dev, test = data.train_dev_test()
 
         augmentations = [
-            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=3000, windowlen=2*self.sample_len, selection="random",
+            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=3000, windowlen=2 * self.sample_len,
+                                   selection="random",
                                    strategy="variable"),
             sbg.RandomWindow(windowlen=self.sample_len + 1, strategy="pad"),
             FillMissingComponents(),
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
-            FilterZChannel(),
+            FilterZChannel() if self.d_data == 1 else None,
             sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
             sbg.ChangeDtype(np.float32),
             QuantizeAugmentation(bits=self.bits),
+            TransposeSeqChannels() if self.d_data == 3 else None,
             AutoregressiveShift()
         ]
+
+        augmentations = [a for a in augmentations if a is not None]
 
         self.dataset_train = sbg.GenericGenerator(train)
         self.dataset_val = sbg.GenericGenerator(dev)
@@ -75,13 +82,15 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.dataset_val.add_augmentations(augmentations)
         self.dataset_test.add_augmentations(augmentations)
 
-        self.num_classes = 2**self.bits
+        self.num_classes = 2 ** self.bits
+
 
 class SeisBenchPhasePick(SeisbenchDataLit):
-    def __init__(self, sample_len: int = 2048, bits: int = 8, **kwargs):
+    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
         self.bits = bits
+        self.d_data = d_data
         self.setup()
 
     def setup(self):
@@ -89,17 +98,20 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         train, dev, test = data.train_dev_test()
 
         augmentations = [
-            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=3000, windowlen=2 * self.sample_len, selection="random",
+            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=3000, windowlen=2 * self.sample_len,
+                                   selection="random",
                                    strategy="variable"),
             sbg.RandomWindow(windowlen=self.sample_len, strategy="pad"),
             FillMissingComponents(),
             sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
-            FilterZChannel(),
+            FilterZChannel() if self.d_data == 1 else None,
             sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
             sbg.ChangeDtype(np.float32),
             QuantizeAugmentation(bits=self.bits),
+            TransposeSeqChannels() if self.d_data == 3 else None,
             TransposeLabels(),
         ]
+        augmentations = [a for a in augmentations if a is not None]
 
         self.dataset_train = sbg.GenericGenerator(train)
         self.dataset_val = sbg.GenericGenerator(dev)
@@ -109,4 +121,26 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         self.dataset_val.add_augmentations(augmentations)
         self.dataset_test.add_augmentations(augmentations)
 
-        self.num_classes = 2**self.bits
+        self.num_classes = 2 ** self.bits
+
+
+def phase_pick_test():
+    data_config = {
+        'sample_len': 2048,
+        'bits': 0,
+        'd_data': 3,
+    }
+    loader_config = {
+        'batch_size': 4,
+        'num_workers': 0,
+        'shuffle': True,
+    }
+    dataset = SeisBenchPhasePick(**data_config)
+    train_loader = DataLoader(dataset.dataset_train, **loader_config)
+
+    batch = next(iter(train_loader))
+    print(len(train_loader.dataset))
+
+
+if __name__ == "__main__":
+    phase_pick_test()
