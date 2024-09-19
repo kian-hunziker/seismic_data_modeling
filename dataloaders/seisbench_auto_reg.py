@@ -82,7 +82,8 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.dataset_val.add_augmentations(augmentations)
         self.dataset_test.add_augmentations(augmentations)
 
-        self.num_classes = 2 ** self.bits
+        if self.bits > 0:
+            self.num_classes = 2 ** self.bits
 
 
 class SeisBenchPhasePick(SeisbenchDataLit):
@@ -121,25 +122,30 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         self.dataset_val.add_augmentations(augmentations)
         self.dataset_test.add_augmentations(augmentations)
 
-        self.num_classes = 2 ** self.bits
+        if self.bits > 0:
+            self.num_classes = 2 ** self.bits
 
 
 def phase_pick_test():
     data_config = {
-        'sample_len': 2048,
+        'sample_len': 4096,
         'bits': 0,
         'd_data': 3,
     }
     loader_config = {
-        'batch_size': 4,
+        'batch_size': 128,
         'num_workers': 0,
         'shuffle': True,
     }
-    dataset = SeisBenchPhasePick(**data_config)
+    dataset = SeisBenchAutoReg(**data_config)
     train_loader = DataLoader(dataset.dataset_train, **loader_config)
 
     batch = next(iter(train_loader))
     print(len(train_loader.dataset))
+
+    for i, batch in enumerate(train_loader):
+        autoreg_mse = torch.nn.functional.mse_loss(batch['X'], batch['y'])
+        print(f'autoreg_mse: {autoreg_mse :.2f}')
 
 
 if __name__ == "__main__":

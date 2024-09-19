@@ -31,7 +31,7 @@ class DummyDecoder(Decoder):
 
 
 class LinearDecoder(Decoder):
-    def __init__(self, in_features, out_features):
+    def __init__(self, in_features, out_features, num_classes=None):
         super().__init__(in_features, out_features)
         self.linear = nn.Linear(in_features, out_features)
 
