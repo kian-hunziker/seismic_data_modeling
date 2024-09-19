@@ -88,12 +88,45 @@ class SigDecoder(nn.Module):
         return x
 
 
+def s4_block(dim, bidirectional=False, dropout=0.0, **s4_args):
+    layer = S4(
+        d_model=dim,
+        d_state=64,
+        bidirectional=bidirectional,
+        dropout=dropout,
+        transposed=True,
+        **s4_args,
+    )
+    return ResidualBlock(
+        d_model=dim,
+        layer=layer,
+        dropout=dropout,
+    )
+
+
+def ff_block(dim, ff=2, dropout=0.0):
+    layer = FFBlock(
+        d_model=dim,
+        expand=ff,
+        dropout=dropout,
+    )
+    return ResidualBlock(
+        d_model=dim,
+        layer=layer,
+        dropout=dropout,
+    )
+
+
 class S4Decoder(nn.Module):
-    def __init__(self, d_model, n_blocks, bidirectional=False):
+    def __init__(self, d_model, n_blocks, bidirectional=False, add_mean=False):
         super(S4Decoder, self).__init__()
         self.d_model = d_model
         self.n_blocks = n_blocks
         self.bidirectional = bidirectional
+        self.add_mean = add_mean
+
+        # if self.add_mean:
+        #    self.in_proj = nn.Linear(in_features=d_model, out_features=d_model)
 
         self.conv_t = nn.ConvTranspose1d(
             in_channels=1,
@@ -104,33 +137,6 @@ class S4Decoder(nn.Module):
         )
         self.out_proj = nn.Linear(d_model, 1)
 
-        def s4_block(dim, bidirectional=False, dropout=0.0, **s4_args):
-            layer = S4(
-                d_model=dim,
-                d_state=64,
-                bidirectional=bidirectional,
-                dropout=dropout,
-                transposed=True,
-                **s4_args,
-            )
-            return ResidualBlock(
-                d_model=dim,
-                layer=layer,
-                dropout=dropout,
-            )
-
-        def ff_block(dim, ff=2, dropout=0.0):
-            layer = FFBlock(
-                d_model=dim,
-                expand=ff,
-                dropout=dropout,
-            )
-            return ResidualBlock(
-                d_model=dim,
-                layer=layer,
-                dropout=dropout,
-            )
-
         blocks = []
         for i in range(n_blocks):
             blocks.append(s4_block(dim=d_model))
@@ -140,10 +146,16 @@ class S4Decoder(nn.Module):
     def _forward(self, x, state=None):
         if x.dim == 3:
             x = x.squeeze(-1)
+        if self.add_mean:
+            means = x[:, 0]
+            # x = self.in_proj(x)
+            x[:, 1:] = x[:, 1:] + means.unsqueeze(-1)
         x = self.conv_t(x.unsqueeze(1))
         for block in self.blocks:
             x, _ = block(x)
         x = self.out_proj(x.transpose(1, 2))
+        # if self.add_mean:
+        #    x = x + means.unsqueeze(-1).unsqueeze(-1)
         return x
 
     def forward(self, x, state=None):
@@ -178,20 +190,73 @@ class UpPoolDecoder(nn.Module):
         return x
 
 
+class EmbeddingDecoder(nn.Module):
+    def __init__(self, num_classes, output_dim, d_model=64, n_blocks=0):
+        super(EmbeddingDecoder, self).__init__()
+        self.num_classes = num_classes
+        self.output_dim = output_dim
+        self.d_model = d_model
+        self.n_blocks = n_blocks
+
+        self.embedding = nn.Embedding(self.num_classes, self.output_dim)
+
+        self.conv_t = nn.ConvTranspose1d(
+            in_channels=1,
+            out_channels=d_model,
+            kernel_size=16,
+            stride=16,
+            padding=0,
+        )
+        self.out_proj = nn.Linear(d_model, 1)
+
+        blocks = []
+        for i in range(n_blocks):
+            blocks.append(s4_block(dim=d_model))
+            blocks.append(ff_block(dim=d_model))
+        self.blocks = nn.ModuleList(blocks)
+
+    def forward(self, x, state=None):
+        if self.n_blocks == 0:
+            x = self.embedding(x).transpose(1, 2)
+            return x
+        else:
+            x = self.embedding(x)
+            x = self.conv_t(x)
+            for block in self.blocks:
+                x, _ = block(x)
+            x = self.out_proj(x.transpose(1, 2))
+
+        return x
+
+
+class PhasePickDecoder(nn.Module):
+    def __init__(self, d_model, output_dim=3):
+        super(PhasePickDecoder, self).__init__()
+        self.linear = nn.Linear(d_model, output_dim)
+
+    def forward(self, x, state=None):
+        return self.linear(x)
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
     'transformer': SigDecoder,
     's4-decoder': S4Decoder,
     'pool': UpPoolDecoder,
+    'embedding': EmbeddingDecoder,
+    'phase-pick': PhasePickDecoder
 }
+
+pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
+phasepick_decoders = ['phase-pick']
 
 
 def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Module = None):
     if decoder is None:
         return None
 
-    if decoder._name_ == 'transformer' or decoder._name_ == 's4-decoder' or decoder._name_ == 'pool':
+    if decoder._name_ in pretrain_decoders:
         obj = instantiate(dec_registry, decoder)
         return obj
 
@@ -208,6 +273,10 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
         out_features = dataset.num_classes
     else:
         out_features = dataset.d_data
+
+    if decoder._name_ in phasepick_decoders:
+        obj = instantiate(dec_registry, decoder, d_model=in_features)
+        return obj
 
     obj = instantiate(dec_registry, decoder, in_features=in_features, out_features=out_features)
 

@@ -34,4 +34,5 @@ dataset = {
     "costarica-bpe": "dataloaders.costa_rica_bpe.CostaRicaBPELightning",
     "costarica-enc-dec": "dataloaders.costa_rica_quantized.CostaRicaEncDecLightning",
     "ethz-auto-reg": "dataloaders.seisbench_auto_reg.SeisBenchAutoReg",
+    "ethz-phase-pick": "dataloaders.seisbench_auto_reg.SeisBenchPhasePick",
 }

@@ -32,5 +32,6 @@ class Task:
 task_registry = {
     'default': Task,
     'classification': Task,
-    'regression': Task
+    'regression': Task,
+    'phase_pick': Task
 }

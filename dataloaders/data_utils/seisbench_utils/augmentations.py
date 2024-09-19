@@ -76,3 +76,17 @@ class AutoregressiveShift:
         x, metadata = state_dict[self.key[0]]
         state_dict[self.key[0]] = (x[:-1], metadata)
         state_dict[self.key[1]] = (x[1:], metadata)
+
+
+class TransposeLabels:
+    def __init__(self, key=('X', 'y'), ):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+
+    def __call__(self, state_dict):
+        # x, meta_x = state_dict[self.key[0]]
+        y, meta_y = state_dict[self.key[1]]
+        # state_dict[self.key[0]] = (np.transpose(x, (0, 2, 1)), meta_x)
+        state_dict[self.key[1]] = (y.T, meta_y)

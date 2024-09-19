@@ -44,6 +44,14 @@ def cross_entropy_with_context(output, target, context_len):
     return F.cross_entropy(output, target)
 
 
+def phase_pick_loss(y_pred, y_true, eps=1e-5):
+    # vector cross entropy loss
+    h = y_true * torch.log(F.softmax(y_pred, dim=-1) + eps)
+    h = h.mean(1).sum(-1)  # Mean along sample dimension and sum along pick dimension
+    h = h.mean()  # Mean over batch axis
+    return -h
+
+
 metric_functions = {
     'mse': mse,
     'log_mse': log_mse,
@@ -52,4 +60,5 @@ metric_functions = {
     'accuracy': accuracy,
     'cross-entropy': cross_entropy,
     'cross-entropy-context': cross_entropy_with_context,
+    'phase-pick': phase_pick_loss,
 }

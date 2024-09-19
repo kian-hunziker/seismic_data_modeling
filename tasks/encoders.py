@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from dataloaders.data_utils.signal_encoding import quantize_encode
 from utils.config_utils import instantiate
 from dataloaders.base import SequenceDataset
 from tasks.positional_encoding import PositionalEncoding
@@ -190,11 +191,52 @@ class S4Encoder(nn.Module):
             return self._forward(x)
 
 
+class S4ClassEncoder(nn.Module):
+    def __init__(self, d_model, n_blocks, num_classes, bidirectional=False):
+        super(S4ClassEncoder, self).__init__()
+        self.d_model = d_model
+        self.n_blocks = n_blocks
+        self.bidirectional = bidirectional
+        self.num_classes = num_classes
+
+        # self.input_linear = nn.Linear(1, d_model)
+        self.input_linear = nn.Conv1d(in_channels=1, out_channels=d_model, kernel_size=5, stride=1, padding=2)
+        self.output_linear = nn.Linear(in_features=d_model, out_features=num_classes)
+
+        blocks = []
+        for i in range(n_blocks):
+            blocks.append(s4_block(dim=d_model))
+            blocks.append(ff_block(dim=d_model))
+
+        self.blocks = nn.ModuleList(blocks)
+
+    def _forward(self, x):
+        x = x.transpose(1, 2)
+        x = self.input_linear(x)
+        for block in self.blocks:
+            x, _ = block(x)
+        x = x[:, :, -1]
+        x = self.output_linear(x)
+        x = torch.argmax(x, dim=-1).unsqueeze(-1)
+        #x = torch.multinomial(F.softmax(x, dim=-1), 1)
+        return x.long()
+
+    def forward(self, x, state=None):
+        if self.bidirectional:
+            x_rev = torch.flip(x, dims=[1])
+            out_forward = self._forward(x)
+            out_rev = self._forward(x_rev)
+            return out_forward + out_rev
+        else:
+            return self._forward(x)
+
+
 class DownPoolEncoder(nn.Module):
-    def __init__(self, hidden_dim, pool=16, n_blocks=0):
+    def __init__(self, hidden_dim, pool=16, n_blocks=0, remove_mean=False):
         super(DownPoolEncoder, self).__init__()
         self.pool = pool
         self.n_blocks = n_blocks
+        self.remove_mean = remove_mean
 
         self.linear1 = nn.Linear(pool, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, 1)
@@ -210,6 +252,9 @@ class DownPoolEncoder(nn.Module):
             self.blocks = nn.ModuleList(blocks)
 
     def forward(self, x, state=None):
+        if self.remove_mean:
+            means = torch.mean(x, dim=1, keepdim=True)
+            x = x - means
         x = x.reshape(x.shape[0], -1, self.pool)
         x = F.relu(self.linear1(x))
         if self.n_blocks > 0:
@@ -219,6 +264,8 @@ class DownPoolEncoder(nn.Module):
             x = x.transpose(1, 2)
         x = self.linear2(x)
         # x = self.out_proj(x.flatten(1, -1))
+        if self.remove_mean:
+            x[:, 0] = means[:, 0]
         return x.squeeze(-1)
 
     def prepare_data(self, x, y):
@@ -232,6 +279,35 @@ class DownPoolEncoder(nn.Module):
         return x.reshape(batch_size, -1, 64), y.reshape(batch_size, -1, 64)
 
 
+class DownPoolClassEncoder(nn.Module):
+    def __init__(self, hidden_dim, slice_length=1024, pool=16, num_classes=256, remove_mean=False):
+        super(DownPoolClassEncoder, self).__init__()
+        self.pool = pool
+        self.remove_mean = remove_mean
+        self.num_classes = num_classes
+        self.bits = int(torch.log2(torch.tensor(num_classes)).item())
+
+        self.linear1 = nn.Linear(pool, hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, 1)
+        self.out_proj = nn.Linear(slice_length // pool, num_classes)
+
+    def forward(self, x, state=None):
+        if self.remove_mean:
+            means = torch.mean(x, dim=1, keepdim=True)
+            x = x - means
+            # means_encoded = quantize_encode(means, bits=self.bits)
+        x = x.reshape(x.shape[0], -1, self.pool)
+        x = F.relu(self.linear1(x))
+        x = self.linear2(x)
+        if self.remove_mean:
+            x[:, 0] = means[:, 0]
+            # x = x + means_encoded
+        x = self.out_proj(x.flatten(1, -1))
+        x = torch.argmax(x, dim=-1)
+        # x = torch.clamp(0.5 * x + 0.5 * means_encoded.squeeze(), 0, self.num_classes - 1).long()
+        return x.unsqueeze(-1)
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
@@ -241,14 +317,18 @@ enc_registry = {
     'transformer': SigEncoder,
     's4-encoder': S4Encoder,
     'pool': DownPoolEncoder,
+    'learned-classes': DownPoolClassEncoder,
+    's4-class': S4ClassEncoder,
 }
+
+pretrain_encoders = ['transformer, s4-encoder', 'pool', 'learned-classes', 's4-class']
 
 
 def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
     if encoder is None:
         return None
 
-    if encoder._name_ == 'transformer' or encoder._name_ == 's4-encoder' or encoder._name_ == 'pool':
+    if encoder._name_ in pretrain_encoders:
         obj = instantiate(enc_registry, encoder)
         return obj
 
