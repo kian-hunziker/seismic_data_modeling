@@ -230,12 +230,26 @@ class EmbeddingDecoder(nn.Module):
 
 
 class PhasePickDecoder(nn.Module):
-    def __init__(self, d_model, output_dim=3):
+    def __init__(self, d_model, output_dim=3, convolutional=False, kernel_size=33):
         super(PhasePickDecoder, self).__init__()
-        self.linear = nn.Linear(d_model, output_dim)
+        self.convolutional = convolutional
+
+        if self.convolutional:
+            self.conv = nn.Conv1d(
+                in_channels=d_model,
+                out_channels=output_dim,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=int(kernel_size//2),
+            )
+        else:
+            self.linear = nn.Linear(d_model, output_dim)
 
     def forward(self, x, state=None):
-        return self.linear(x)
+        if self.convolutional:
+            return self.conv(x.transpose(1, 2)).transpose(1, 2)
+        else:
+            return self.linear(x)
 
 
 dec_registry = {
