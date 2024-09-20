@@ -11,9 +11,12 @@ defaults:
 
 experiment_name: sashimi_phase_pick
 
+optimizer:
+  weight_decay: 0
+
 model:
   d_model: 16
-  n_layers: 5
+  n_layers: 3
   expand: 2
   ff: 2
   pool:
@@ -42,7 +45,7 @@ decoder:
   convolutional: True
 
 loader:
-  batch_size: 32
+  batch_size: 128
 
 scheduler:
   num_warmup_steps: 10000
