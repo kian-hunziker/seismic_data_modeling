@@ -1,0 +1,65 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: cr_enc_dec
+  - /task: regression
+  - /optimizer: adamw
+  - /scheduler: plateau
+  - /model: identity
+
+experiment_name: pool_enc_dec_mean
+
+train:
+  #ckpt_path: wandb_logs/MA/2024-09-13__15_59_51
+  monitor: val/loss
+  mode: min
+
+task:
+  metrics:
+    - log_mse
+    - mse
+
+encoder:
+  _name_: pool
+  hidden_dim: 512
+  pool: 16
+  n_blocks: 0
+  remove_mean: True
+
+decoder:
+  _name_: s4-decoder
+  d_model: 96
+  n_blocks: 5
+  bidirectional: False
+  add_mean: True
+
+#decoder:
+#  _name_: transformer
+#  d_model: 64
+#  seq_len: 1024
+#  latent_dim: 64
+#  regression: True
+#  vocab_size: 256
+#  nhead: 8
+#  dim_feedforward: 128
+#  num_layers: 4
+
+loader:
+  batch_size: 16
+
+scheduler:
+  patience: 100
+
+trainer:
+  max_steps: 10000
+  max_epochs: 50000
+  log_every_n_steps: 1
+  #gradient_clip_val: 1.0
+  precision: 32
+
+dataset:
+  data_dir: dataloaders/data/costa_rica/small_subset
+  sample_len: 1024
+  bits: 0

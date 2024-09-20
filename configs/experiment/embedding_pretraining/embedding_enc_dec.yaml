@@ -6,13 +6,13 @@ defaults:
   - /dataset: cr_enc_dec
   - /task: regression
   - /optimizer: adamw
-  - /scheduler: plateau
+  - /scheduler: cosine_warmup  #plateau
   - /model: identity
 
-experiment_name: pool_enc_dec_transformer
+experiment_name: embedding_enc_dec
 
 train:
-  #ckpt_path: wandb_logs/MA/2024-09-06__16_06_55
+  #ckpt_path: wandb_logs/MA/2024-09-16__15_00_20
   monitor: val/loss
   mode: min
 
@@ -22,34 +22,29 @@ task:
     - mse
 
 encoder:
-  _name_: pool
-  hidden_dim: 128
-  pool: 16
-
-#decoder:
-#  _name_: s4-decoder
-#  d_model: 64
-#  n_blocks: 5
+  _name_: s4-class
+  d_model: 64
+  n_blocks: 3
+  num_classes: 256
 
 decoder:
-  _name_: transformer
-  d_model: 64
-  seq_len: 1024
-  latent_dim: 64
-  regression: True
-  vocab_size: 256
-  nhead: 8
-  dim_feedforward: 128
-  num_layers: 4
+  _name_: embedding
+  num_classes: 256
+  output_dim: 64
+  n_blocks: 3
+
 
 loader:
-  batch_size: 16
+  batch_size: 64
 
+#scheduler:
+#  patience: 100
 scheduler:
-  patience: 40
+  num_warmup_steps: 100
+  num_training_steps: 1000
 
 trainer:
-  max_steps: 50000
+  max_steps: 1000
   max_epochs: 50000
   log_every_n_steps: 1
   #gradient_clip_val: 1.0
