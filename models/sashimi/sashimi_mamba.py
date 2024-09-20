@@ -328,7 +328,12 @@ class MambaSashimi(nn.Module):
                 dt_rank=dt_rank
             )
             norm_cls = partial(RMSNorm, eps=1e-5)
-            mlp_cls = nn.Identity
+            if ff == 0:
+                mlp_cls = nn.Identity
+            else:
+                mlp_cls = partial(
+                    GatedMLP, hidden_features=ff * d_model, bias=True,
+                )
             block = Block(
                 dim,
                 mixer_cls,
