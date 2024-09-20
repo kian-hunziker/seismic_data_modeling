@@ -37,6 +37,8 @@ class LinearEncoder(Encoder):
         self.linear = nn.Linear(in_features, out_features)
 
     def forward(self, x):
+        if x.dim() == 2:
+            x = x.unsqueeze(-1)
         return self.linear(x)
 
 
