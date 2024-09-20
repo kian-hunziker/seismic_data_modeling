@@ -7,8 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataloaders.seisbench_auto_reg import SeisBenchPhasePick
-from tasks.metrics import phase_pick_loss
+#from dataloaders.seisbench_auto_reg import SeisBenchPhasePick
+#from tasks.metrics import phase_pick_loss
 
 
 class PhaseNetWrapper(nn.Module):
