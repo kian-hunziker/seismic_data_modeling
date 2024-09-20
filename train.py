@@ -33,7 +33,7 @@ from omegaconf import DictConfig, OmegaConf
 
 
 class LightningSequenceModel(pl.LightningModule):
-    def __init__(self, config):
+    def __init__(self, config, preload_data: bool = False):
         super().__init__()
         self.save_hyperparameters(config)
         if config.encoder.get("pretrained", None) is not None:
@@ -46,7 +46,10 @@ class LightningSequenceModel(pl.LightningModule):
             self.use_pretrained_decoder = False
 
             # initialize dataset:
-        self.dataset = instantiate(registry.dataset, self.hparams.dataset)
+        if preload_data:
+            self.dataset = instantiate(registry.dataset, self.hparams.dataset, preload=preload_data)
+        else:
+            self.dataset = instantiate(registry.dataset, self.hparams.dataset)
 
         self.setup()
 
@@ -364,18 +367,23 @@ def main(config: OmegaConf) -> None:
 
         print(f'cuda available: {torch.cuda.is_available()}')
 
+        preload = config.dataset.get('_name_') in registry.preloadable_datasets
+
         if config.train.get("ckpt_path", None) is not None:
             print(f'loading checkpoint from {config.train.ckpt_path}')
             model, hparams, ckpt_path = load_checkpoint(config.train.ckpt_path, return_path=True)
             # fixes for sequence length warmup
             # reload the dataset, updates the sample length
-            model.dataset = instantiate(registry.dataset, config.dataset)
+            if preload:
+                model.dataset = instantiate(registry.dataset, config.dataset, preload=preload)
+            else:
+                model.dataset = instantiate(registry.dataset, config.dataset)
             # update the batch size
             model.hparams.loader.batch_size = config.loader.batch_size
             trainer = create_trainer(config)
         else:
             trainer = create_trainer(config)
-            model = LightningSequenceModel(config)
+            model = LightningSequenceModel(config, preload_data=preload)
 
         plot_and_save_training_examples(model, trainer, num_examples=16)
 

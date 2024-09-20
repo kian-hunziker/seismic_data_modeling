@@ -46,15 +46,20 @@ phase_dict = {
 
 
 class SeisBenchAutoReg(SeisbenchDataLit):
-    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, **kwargs):
+    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, preload: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
         self.d_data = d_data
         self.bits = bits
+        self.preload = preload
         self.setup()
 
     def setup(self):
-        data = sbd.ETHZ(sampling_rate=100)
+        if self.preload:
+            data = sbd.ETHZ(sampling_rate=100, cache='full')
+            data.preload_waveforms(pbar=True)
+        else:
+            data = sbd.ETHZ(sampling_rate=100)
         train, dev, test = data.train_dev_test()
 
         augmentations = [
@@ -87,15 +92,20 @@ class SeisBenchAutoReg(SeisbenchDataLit):
 
 
 class SeisBenchPhasePick(SeisbenchDataLit):
-    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, **kwargs):
+    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, preload: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
         self.bits = bits
         self.d_data = d_data
+        self.preload = preload
         self.setup()
 
     def setup(self):
-        data = sbd.ETHZ(sampling_rate=100)
+        if self.preload:
+            data = sbd.ETHZ(sampling_rate=100, cache='full')
+            data.preload_waveforms(pbar=True)
+        else:
+            data = sbd.ETHZ(sampling_rate=100)
         train, dev, test = data.train_dev_test()
 
         augmentations = [
