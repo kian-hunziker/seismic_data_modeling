@@ -36,3 +36,8 @@ dataset = {
     "ethz-auto-reg": "dataloaders.seisbench_auto_reg.SeisBenchAutoReg",
     "ethz-phase-pick": "dataloaders.seisbench_auto_reg.SeisBenchPhasePick",
 }
+
+preloadable_datasets = [
+    "ethz-auto-reg",
+    "ethz-phase-pick",
+]
