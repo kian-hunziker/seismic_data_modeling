@@ -1,3 +1,5 @@
+import models.phasenet_benchmark
+
 optimizer = {
     "adam":    "torch.optim.Adam",
     "adamw":   "torch.optim.AdamW",
@@ -23,7 +25,8 @@ model = {
     "mamba-sashimi": "models.sashimi.sashimi_mamba.MambaSashimi",
     "pure-mamba": "models.pure_mamba.PureMamba",
     "lstm": "models.lstm_baseline.LSTMSequenceModel",
-    "identity": "models.simple_test_models.IdentityModel"
+    "identity": "models.simple_test_models.IdentityModel",
+    "phase-net": "models.phasenet_benchmark.PhaseNetWrapper",
 }
 
 dataset = {
