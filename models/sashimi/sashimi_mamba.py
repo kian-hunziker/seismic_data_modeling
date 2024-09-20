@@ -312,6 +312,7 @@ class MambaSashimi(nn.Module):
         self.d_conv = d_conv
         self.unet = unet
         self.complex = complex
+        self.n_layers = n_layers
 
         def mamba_block(dim, layer_idx):
             # make sure, the dt_rank is divisible by 2 which is required to make complex step function work
@@ -533,7 +534,7 @@ class MambaSashimi(nn.Module):
                 for i in range(skipped):
                     next_state.append(state.pop())
                 # TODO: double check this! used to be skipped // 3 but didnt work for 5 layer unet
-                u_layers = list(self.u_layers)[skipped // 4:]
+                u_layers = list(self.u_layers)[skipped // self.n_layers:]
             else:
                 for i in range(skipped):
                     for _ in range(len(self.u_layers[i])):
