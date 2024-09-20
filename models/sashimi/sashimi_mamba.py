@@ -527,7 +527,8 @@ class MambaSashimi(nn.Module):
             if self.unet:
                 for i in range(skipped):
                     next_state.append(state.pop())
-                u_layers = list(self.u_layers)[skipped // 3:]
+                # TODO: double check this! used to be skipped // 3 but didnt work for 5 layer unet
+                u_layers = list(self.u_layers)[skipped // 4:]
             else:
                 for i in range(skipped):
                     for _ in range(len(self.u_layers[i])):
