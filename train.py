@@ -86,7 +86,7 @@ class LightningSequenceModel(pl.LightningModule):
     def _on_epoch_start(self):
         self._initialize_state()
 
-    def forward(self, batch, batch_idx):
+    def forward(self, batch, batch_idx=None):
         if isinstance(self.dataset, SeisbenchDataLit):
             x = batch['X']
             y = batch['y']
@@ -186,6 +186,11 @@ class LightningSequenceModel(pl.LightningModule):
         loss = self._step_with_metrics(batch, batch_idx, prefix='test')
         print(f'Test Loss: {loss:.4f}')
         return loss
+
+    def predict_step(self, batch, batch_idx):
+        #print(f'predicting on {batch_idx}')
+        x, y = self.forward(batch, batch_idx)
+        return x, y
 
     def configure_optimizers(self):
         # Set zero weight decay for some params
