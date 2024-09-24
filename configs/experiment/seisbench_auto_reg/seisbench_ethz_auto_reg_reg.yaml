@@ -9,18 +9,19 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: mamba_sashimi
 
-experiment_name: mamba_seisbench_auto_reg_regression
+experiment_name: mamba_seisbench_auto_reg_regression_large
 
 model:
   d_model: 64
-  n_layers: 5
+  n_layers: 16
   expand: 2
   ff: 2
   pool:
     - 4
     - 4
   dropout: 0.0
-  unet: False
+  unet: True
+  d_conv: 64
   complex: True
 
 train:
@@ -47,10 +48,10 @@ loader:
   batch_size: 32
 
 scheduler:
-  num_warmup_steps: 100
-  num_training_steps: 10000
+  num_warmup_steps: 50000
+  num_training_steps: 500000
 
 trainer:
-  max_steps: 10000
-  max_epochs: 10000
+  max_steps: 500000
+  max_epochs: 500000
   gradient_clip_val: 1.0

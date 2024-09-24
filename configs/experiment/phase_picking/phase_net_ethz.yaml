@@ -5,14 +5,10 @@ defaults:
   - /loader: default
   - /dataset: seisbench_phase
   - /task: phase_pick
-  - /optimizer: adamw_mamba
-  - /scheduler: cosine_warmup
+  - /optimizer: adam_phasenet
   - /model: phase_net
 
 experiment_name: phase_net_ethz
-
-optimizer:
-  weight_decay: 0
 
 train:
   monitor: val/loss
@@ -30,13 +26,8 @@ decoder:
   _name_: dummy
 
 loader:
-  batch_size: 128
-
-scheduler:
-  num_warmup_steps: 10000
-  num_training_steps: 100000
+  batch_size: 256
 
 trainer:
-  max_steps: 100000
-  max_epochs: 100000
-  #gradient_clip_val: 1.0
+  max_epochs: 100
+

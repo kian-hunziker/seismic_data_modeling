@@ -45,13 +45,13 @@ decoder:
   convolutional: True
 
 loader:
-  batch_size: 128
+  batch_size: 256
 
 scheduler:
-  num_warmup_steps: 10000
-  num_training_steps: 100000
+  num_warmup_steps: 890
+  num_training_steps: 8900
 
 trainer:
-  max_steps: 100000
-  max_epochs: 100000
-  gradient_clip_val: 1.0
+  max_steps: 8900
+  max_epochs: 100
+  #gradient_clip_val: 1.0
