@@ -1,16 +1,8 @@
-import os
-import pickle
-from functools import partial
 from pathlib import Path
 
-import numpy as np
 import torch
-import torchaudio.functional as TF
-import torchvision
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
-from einops import rearrange
 import pytorch_lightning as pl
+from seisbench.util import worker_seeding
 
 
 class SequenceDataset(pl.LightningDataModule):
@@ -73,7 +65,7 @@ class SeisbenchDataLit(pl.LightningDataModule):
         pass
 
     def _dataloader(self, dataset, **kwargs):
-        return torch.utils.data.DataLoader(dataset, **kwargs)
+        return torch.utils.data.DataLoader(dataset, worker_init_fn=worker_seeding, **kwargs)
 
     def train_dataloader(self, **kwargs):
         return self._dataloader(self.dataset_train, **kwargs)
