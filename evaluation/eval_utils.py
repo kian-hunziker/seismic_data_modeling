@@ -18,11 +18,13 @@ def _extract_step_number(filename):
     return None
 
 
-def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False) -> tuple[LightningSequenceModel, dict]:
+def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False,) -> tuple[LightningSequenceModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
     If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
     step number is returned.
+    :param return_path: if true, the path to the checkpoint will be returned
+    :param location: device to map the checkpoint to (e.g. cuda or cpu). Defaults to 'cpu'
     :param checkpoint_path: path to checkpoint file. The hparams file is extracted automatically
     :return: LightningSequenceModel, hparams
     """
