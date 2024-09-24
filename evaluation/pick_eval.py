@@ -101,6 +101,10 @@ def save_pick_predictions(
             task_targets = pd.read_csv(task_csv)
             task_targets = task_targets[task_targets["trace_split"] == eval_set]
 
+            if len(task_targets) == 0:
+                print(f'No targets found in set {eval_set} for task {task}')
+                continue
+
             if task == "1" and targets.name == "InstanceCountsCombined":
                 border = _identify_instance_dataset_border(task_targets)
                 task_targets["trace_name"].values[border:] = task_targets["trace_name"][
