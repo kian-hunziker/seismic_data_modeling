@@ -45,6 +45,10 @@ phase_dict = {
 }
 
 
+def remove_unused_augmentations(augmentations):
+    return [a for a in augmentations if a is not None]
+
+
 def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 0):
     augmentations = [
         sbg.SteeredWindow(windowlen=sample_len, strategy="pad"),
@@ -52,7 +56,7 @@ def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 
         sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
         TransposeSeqChannels() if d_data == 3 else None,
     ]
-    augmentations = [a for a in augmentations if a is not None]
+    augmentations = remove_unused_augmentations(augmentations)
     '''
             sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=sample_len // 3, windowlen=sample_len,
                                selection="random",
@@ -102,7 +106,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             AutoregressiveShift()
         ]
 
-        augmentations = [a for a in augmentations if a is not None]
+        augmentations = remove_unused_augmentations(augmentations)
 
         self.dataset_train = sbg.GenericGenerator(train)
         self.dataset_val = sbg.GenericGenerator(dev)
@@ -117,12 +121,23 @@ class SeisBenchAutoReg(SeisbenchDataLit):
 
 
 class SeisBenchPhasePick(SeisbenchDataLit):
-    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, preload: bool = False, **kwargs):
+    def __init__(
+            self,
+            sample_len: int = 2048,
+            bits: int = 8,
+            d_data: int = 1,
+            preload: bool = False,
+            sample_boundaries=(None, None),
+            sigma=20,
+            **kwargs
+    ):
         super().__init__(**kwargs)
         self.sample_len = sample_len
         self.bits = bits
         self.d_data = d_data
         self.preload = preload
+        self.sample_boundaries = sample_boundaries
+        self.sigma = sigma
         self.setup()
 
     def setup(self):
@@ -134,20 +149,40 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         train, dev, test = data.train_dev_test()
 
         augmentations = [
-            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=3000, windowlen=2 * self.sample_len,
-                                   selection="random",
-                                   strategy="variable"),
-            sbg.RandomWindow(windowlen=self.sample_len, strategy="pad"),
+            # In 2/3 of the cases, select windows around picks, to reduce amount of noise traces in training.
+            # Uses strategy variable, as padding will be handled by the random window.
+            # In 1/3 of the cases, just returns the original trace, to keep diversity high.
+            sbg.OneOf(
+                [
+                    sbg.WindowAroundSample(
+                        list(phase_dict.keys()),
+                        samples_before=3000,
+                        windowlen=2 * self.sample_len,
+                        selection="random",
+                        strategy="variable",
+                    ),
+                    sbg.NullAugmentation(),
+                ],
+                probabilities=[2, 1],
+            ),
+            sbg.RandomWindow(
+                low=self.sample_boundaries[0],
+                high=self.sample_boundaries[1],
+                windowlen=self.sample_len,
+                strategy="pad",
+            ),
             FillMissingComponents(),
-            sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
-            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
             sbg.ChangeDtype(np.float32),
-            QuantizeAugmentation(bits=self.bits),
+            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
+            QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
+            sbg.ProbabilisticLabeller(
+                label_columns=phase_dict, sigma=self.sigma, dim=0
+            ),
             TransposeSeqChannels() if self.d_data == 3 else None,
             TransposeLabels(),
         ]
-        augmentations = [a for a in augmentations if a is not None]
+        augmentations = remove_unused_augmentations(augmentations)
 
         self.dataset_train = sbg.GenericGenerator(train)
         self.dataset_val = sbg.GenericGenerator(dev)

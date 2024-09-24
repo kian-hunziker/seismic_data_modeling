@@ -44,7 +44,7 @@ class DuplicateEvent:
     """
 
     def __init__(
-        self, inv_scale=(1, 10), detection_key="detections", key="X", label_keys=None
+            self, inv_scale=(1, 10), detection_key="detections", key="X", label_keys=None
     ):
         if isinstance(detection_key, str):
             self.detection_key = (detection_key, detection_key)
@@ -99,8 +99,8 @@ class DuplicateEvent:
                     x = x.copy()
 
                 space = min(event_end - event_start, n_samples - second_start)
-                x[:, second_start : second_start + space] += (
-                    x[:, event_start : event_start + space] * scale
+                x[:, second_start: second_start + space] += (
+                        x[:, event_start: event_start + space] * scale
                 )
 
                 shift = second_start - event_start
@@ -129,6 +129,8 @@ class DuplicateEvent:
                 state_dict[label_key[1]] = (y, metadata)
 
         state_dict[self.key[1]] = (x, metadata)
+
+
 class QuantizeAugmentation:
     def __init__(self, key='X', bits=8):
         if isinstance(key, str):
