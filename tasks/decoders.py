@@ -240,7 +240,7 @@ class PhasePickDecoder(nn.Module):
                 out_channels=output_dim,
                 kernel_size=kernel_size,
                 stride=1,
-                padding=int(kernel_size//2),
+                padding=int(kernel_size // 2),
             )
         else:
             self.linear = nn.Linear(d_model, output_dim)
@@ -294,6 +294,14 @@ def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Modu
 
     obj = instantiate(dec_registry, decoder, in_features=in_features, out_features=out_features)
 
+    return obj
+
+
+def instantiate_decoder_simple(decoder, d_data, d_model):
+    if decoder._name_ in phasepick_decoders:
+        obj = instantiate(dec_registry, decoder, d_model=d_model)
+        return obj
+    obj = instantiate(dec_registry, decoder, in_features=d_model, out_features=d_data)
     return obj
 
 

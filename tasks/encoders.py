@@ -220,7 +220,7 @@ class S4ClassEncoder(nn.Module):
         x = x[:, :, -1]
         x = self.output_linear(x)
         x = torch.argmax(x, dim=-1).unsqueeze(-1)
-        #x = torch.multinomial(F.softmax(x, dim=-1), 1)
+        # x = torch.multinomial(F.softmax(x, dim=-1), 1)
         return x.long()
 
     def forward(self, x, state=None):
@@ -361,6 +361,11 @@ def instantiate_encoder(encoder, dataset: SequenceDataset = None, model=None):
             out_features=out_features
         )
 
+    return obj
+
+
+def instantiate_encoder_simple(encoder, d_data, d_model):
+    obj = instantiate(enc_registry, encoder, in_features=d_data, out_features=d_model)
     return obj
 
 
