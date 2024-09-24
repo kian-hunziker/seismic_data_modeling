@@ -9,24 +9,25 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: mamba_sashimi
 
-experiment_name: mamba_seisbench_auto_reg_regression_large
+experiment_name: mamba_seisbench_auto_reg_regression
 
 model:
   d_model: 64
-  n_layers: 16
+  n_layers: 5
   expand: 2
-  ff: 2
+  ff: 0
   pool:
     - 4
     - 4
   dropout: 0.0
   unet: True
-  d_conv: 64
+  d_conv: 16
   complex: True
 
 train:
   monitor: val/loss
   mode: min
+  #chpt_path: wandb_logs/MA/
 
 task:
   metrics:
@@ -34,7 +35,7 @@ task:
     - mse
 
 dataset:
-  sample_len: 1024
+  sample_len: 4096
   bits: 0
   d_data: 3
 
@@ -45,13 +46,17 @@ decoder:
   _name_: linear
 
 loader:
-  batch_size: 32
+  batch_size: 128
+  drop_last: True
+
+# the ETHZ train dataset has 22626 traces
+# with batch size 128 and drop last true that is 176 batches per epoch
 
 scheduler:
-  num_warmup_steps: 50000
-  num_training_steps: 500000
+  num_warmup_steps: 5280
+  num_training_steps: 52800
 
 trainer:
-  max_steps: 500000
-  max_epochs: 500000
+  max_steps: 52800
+  max_epochs: 300
   gradient_clip_val: 1.0
