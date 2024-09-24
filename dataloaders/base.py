@@ -33,17 +33,17 @@ class SequenceDataset(pl.LightningDataModule):
             generator=torch.Generator().manual_seed(getattr(self, 'seed', 42)),
         )
 
-    def _dataloader(self, dataset, **kwargs):
-        return torch.utils.data.DataLoader(dataset, **kwargs)
+    def _dataloader(self, dataset, shuffle, **kwargs):
+        return torch.utils.data.DataLoader(dataset, shuffle=shuffle, **kwargs)
 
     def train_dataloader(self, **kwargs):
-        return self._dataloader(self.dataset_train, **kwargs)
+        return self._dataloader(self.dataset_train, shuffle=True, **kwargs)
 
     def val_dataloader(self, **kwargs):
-        return self._dataloader(self.dataset_val, **kwargs)
+        return self._dataloader(self.dataset_val, shuffle=False, **kwargs)
 
     def test_dataloader(self, **kwargs):
-        return self._dataloader(self.dataset_test, **kwargs)
+        return self._dataloader(self.dataset_test, shuffle=False, **kwargs)
 
 
 class SeisbenchDataLit(pl.LightningDataModule):
@@ -64,14 +64,14 @@ class SeisbenchDataLit(pl.LightningDataModule):
     def setup(self):
         pass
 
-    def _dataloader(self, dataset, **kwargs):
-        return torch.utils.data.DataLoader(dataset, worker_init_fn=worker_seeding, **kwargs)
+    def _dataloader(self, dataset, shuffle, **kwargs):
+        return torch.utils.data.DataLoader(dataset, shuffle=shuffle, worker_init_fn=worker_seeding, **kwargs)
 
     def train_dataloader(self, **kwargs):
-        return self._dataloader(self.dataset_train, **kwargs)
+        return self._dataloader(self.dataset_train, shuffle=True, **kwargs)
 
     def val_dataloader(self, **kwargs):
-        return self._dataloader(self.dataset_val, **kwargs)
+        return self._dataloader(self.dataset_val, shuffle=False, **kwargs)
 
     def test_dataloader(self, **kwargs):
-        return self._dataloader(self.dataset_test, **kwargs)
+        return self._dataloader(self.dataset_test, shuffle=False, **kwargs)
