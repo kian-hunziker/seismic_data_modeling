@@ -45,6 +45,31 @@ phase_dict = {
 }
 
 
+def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 0):
+    augmentations = [
+        sbg.SteeredWindow(windowlen=sample_len, strategy="pad"),
+        sbg.ChangeDtype(np.float32),
+        sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
+        TransposeSeqChannels() if d_data == 3 else None,
+    ]
+    augmentations = [a for a in augmentations if a is not None]
+    '''
+            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=sample_len // 3, windowlen=sample_len,
+                               selection="random",
+                               strategy="variable"),
+        # sbg.RandomWindow(windowlen=self.sample_len, strategy="pad"),
+        FillMissingComponents(),
+        sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
+        FilterZChannel() if d_data == 1 else None,
+        sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
+        sbg.ChangeDtype(np.float32),
+        QuantizeAugmentation(bits=bits),
+        TransposeSeqChannels() if d_data == 3 else None,
+        TransposeLabels(),
+    '''
+    return augmentations
+
+
 class SeisBenchAutoReg(SeisbenchDataLit):
     def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, preload: bool = False, **kwargs):
         super().__init__(**kwargs)
