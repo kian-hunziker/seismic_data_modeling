@@ -1,0 +1,58 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: seisbench_phase
+  - /task: phase_pick
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: sashimi #mamba_sashimi
+
+experiment_name: sashimi_phase_pick_large
+
+optimizer:
+  weight_decay: 0
+
+model:
+  d_model: 32
+  n_layers: 5
+  expand: 2
+  ff: 2
+  pool:
+    - 4
+    - 4
+  dropout: 0.0
+  bidirectional: True
+  unet: True
+  mode: diag
+
+
+train:
+  monitor: val/loss
+  mode: min
+
+dataset:
+  sample_len: 4096
+  bits: 0
+  d_data: 3
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: phase-pick
+  convolutional: True
+  kernel_size: 65
+
+loader:
+  batch_size: 128
+
+scheduler:
+  num_warmup_steps: 1780
+  num_training_steps: 17800
+
+trainer:
+  max_steps: 17800
+  max_epochs: 100
+  #gradient_clip_val: 1.0
