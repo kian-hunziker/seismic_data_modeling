@@ -1,3 +1,4 @@
+import seisbench
 import seisbench.models as sbm
 import seisbench.generate as sbg
 
@@ -122,12 +123,16 @@ class PhasePickerLit(SeisBenchModuleLit):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         if pretrained_name is not None and pretrained_dataset is not None:
+            seisbench.use_backup_repository()
             self.pretrained_benchmark = True
             if pretrained_name == 'PhaseNet':
                 self.model = sbm.PhaseNet.from_pretrained(pretrained_dataset)
                 self.encoder = nn.Identity()
                 self.device = nn.Identity()
                 self.sample_len = 3001
+            if pretrained_name == 'EQTransformer':
+                self.model = sbm.EQTransformer.from_pretrained(pretrained_dataset)
+                self.sample_len = 6000
         else:
             self.pretrained_benchmark = False
             pl_module, hparams, specific_ckpt = load_checkpoint(ckpt_path, location=device, return_path=True)
