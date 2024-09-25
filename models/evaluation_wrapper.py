@@ -15,6 +15,9 @@ except ImportError:
 
 from evaluation.eval_utils import load_checkpoint, get_pipeline_components, print_hparams, get_model_summary
 from dataloaders.seisbench_auto_reg import get_eval_augmentations
+from models.phasenet_wrapper import PhaseNetWrapper
+import torch
+import torch.nn as nn
 
 # Phase dict for labelling. We only study P and S phases without differentiating between them.
 phase_dict = {
@@ -113,25 +116,40 @@ class SeisBenchModuleLit(pl.LightningModule, ABC):
 
 
 class PhasePickerLit(SeisBenchModuleLit):
-    def __init__(self, ckpt_path):
+    def __init__(self, ckpt_path=None, pretrained_name=None, pretrained_dataset=None):
         super().__init__()
         self.save_hyperparameters()
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        pl_module, hparams, specific_ckpt = load_checkpoint(ckpt_path, location=device, return_path=True)
-        try:
-            self.sample_len = hparams['dataset']['sample_len']
-        except:
-            print('Could not determine sample length from checkpoint file')
-            self.sample_len = 4096
 
-        self.model = pl_module.model
-        self.encoder = pl_module.encoder
-        self.decoder = pl_module.decoder
+        if pretrained_name is not None and pretrained_dataset is not None:
+            self.pretrained_benchmark = True
+            if pretrained_name == 'PhaseNet':
+                self.model = sbm.PhaseNet.from_pretrained(pretrained_dataset)
+                self.encoder = nn.Identity()
+                self.device = nn.Identity()
+                self.sample_len = 3001
+        else:
+            self.pretrained_benchmark = False
+            pl_module, hparams, specific_ckpt = load_checkpoint(ckpt_path, location=device, return_path=True)
+            try:
+                self.sample_len = hparams['dataset']['sample_len']
+            except:
+                print('Could not determine sample length from checkpoint file')
+                self.sample_len = 4096
+
+            self.model = pl_module.model
+            self.encoder = pl_module.encoder
+            self.decoder = pl_module.decoder
 
     def forward(self, x):
-        x = self.encoder(x)
-        x, _ = self.model(x, None)
-        x = self.decoder(x, None)
+        if self.pretrained_benchmark:
+            x = x.transpose(1, 2)
+            x = self.model(x, logits=True)
+            x = x.transpose(1, 2)
+        else:
+            x = self.encoder(x)
+            x, _ = self.model(x, None)
+            x = self.decoder(x, None)
         return x
 
     def shared_step(self, batch):

@@ -12,9 +12,12 @@ import torch.nn.functional as F
 
 
 class PhaseNetWrapper(nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained: str = None):
         super(PhaseNetWrapper, self).__init__()
-        self.model = sbm.PhaseNet(phases="PSN", norm="peak")
+        if pretrained is not None:
+            self.model = sbm.PhaseNet.from_pretrained(pretrained)
+        else:
+            self.model = sbm.PhaseNet(phases="PSN", norm="peak")
         self.d_model = 3
 
     def forward(self, x, state=None, **kwargs):
