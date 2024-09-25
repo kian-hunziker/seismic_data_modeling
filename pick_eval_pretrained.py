@@ -23,8 +23,8 @@ if __name__ == '__main__':
     sets = 'train,dev,test'
     target_path = 'evaluation/eval_tasks/' + args.target_dataset
 
-    model_name = 'PhaseNet'
-    training_dataset = 'ethz'
+    model_name = args.model_name
+    training_dataset = args.train_dataset
 
     model = PhasePickerLit(ckpt_path=None, pretrained_name=model_name, pretrained_dataset=training_dataset)
     pe.save_pick_predictions(
@@ -36,4 +36,3 @@ if __name__ == '__main__':
         batch_size=64,
         num_workers=args.num_workers
     )
-    
