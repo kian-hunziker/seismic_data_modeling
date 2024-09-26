@@ -1,0 +1,64 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: seisbench_phase
+  - /task: phase_pick
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: mamba_sashimi
+
+experiment_name: mamba_sash_phase_pick
+
+model:
+  d_model: 64
+  n_layers: 5
+  expand: 2
+  ff: 0
+  pool:
+    - 4
+    - 4
+  dropout: 0.0
+  unet: True
+  d_conv: 16
+  complex: True
+
+train:
+  monitor: val/loss
+  mode: min
+  #chpt_path: wandb_logs/MA/
+
+task:
+  metrics:
+    - log_mse
+    - mse
+
+dataset:
+  sample_len: 4096
+  bits: 0
+  d_data: 3
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: phase-pick
+  convolutional: True
+  kernel_size: 129
+
+loader:
+  batch_size: 128
+  drop_last: True
+
+# the ETHZ train dataset has 22626 traces
+# with batch size 128 and drop last true that is 176 batches per epoch
+
+scheduler:
+  num_warmup_steps: 1760
+  num_training_steps: 17600
+
+trainer:
+  max_steps: 17600
+  max_epochs: 100
+  gradient_clip_val: 1.0
