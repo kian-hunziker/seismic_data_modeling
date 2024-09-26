@@ -219,6 +219,18 @@ def get_results_phase_identification(pred_path):
         pred["phase_label_bin"], pred["score_p_or_s"]
     )
 
+    mcc_thrs = np.sort(pred["score_p_or_s"].values)
+    mcc_thrs = mcc_thrs[np.linspace(0, len(mcc_thrs) - 1, 50, dtype=int)]
+    mccs = []
+    for thr in mcc_thrs:
+        mccs.append(
+            metrics.matthews_corrcoef(
+                pred["phase_label_bin"], pred["score_p_or_s"] > thr
+            )
+        )
+    mcc = np.max(mccs)
+    mcc_thr = mcc_thrs[np.argmax(mccs)]
+
     return {
         'auc': auc,
         'fpr': fpr,
@@ -227,7 +239,9 @@ def get_results_phase_identification(pred_path):
         'recall': recall,
         'f1': f1,
         'f1_threshold': f1_threshold,
-        'best_f1': best_f1
+        'best_f1': best_f1,
+        'mcc': mcc,
+        'mcc_thr': mcc_thr,
     }
 
 
