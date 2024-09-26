@@ -92,7 +92,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         train, dev, test = data.train_dev_test()
 
         augmentations = [
-            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=3000, windowlen=2 * self.sample_len,
+            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=self.sample_len, windowlen=2 * self.sample_len,
                                    selection="random",
                                    strategy="variable"),
             sbg.RandomWindow(windowlen=self.sample_len + 1, strategy="pad"),
@@ -156,7 +156,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
                 [
                     sbg.WindowAroundSample(
                         list(phase_dict.keys()),
-                        samples_before=3000,
+                        samples_before=self.sample_len,
                         windowlen=2 * self.sample_len,
                         selection="random",
                         strategy="variable",
