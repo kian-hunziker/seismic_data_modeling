@@ -150,7 +150,10 @@ class PhasePickerLit(SeisBenchModuleLit):
         if self.pretrained_benchmark:
             x = x.transpose(1, 2)
             x = self.model(x, logits=True)
-            x = x.transpose(1, 2)
+            if isinstance(self.model, sbm.EQTransformer):
+                x = torch.stack(x, dim=-1)
+            else:
+                x = x.transpose(1, 2)
         else:
             x = self.encoder(x)
             x, _ = self.model(x, None)
