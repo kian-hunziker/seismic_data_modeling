@@ -46,7 +46,7 @@ if __name__ == '__main__':
     model_name = args.model_name
     model_name = model_name.replace(' ', '')
     if model_name == 'all':
-        model_names = ['PhaseNet', 'EQTransformer', 'GPD', 'BasicPhase'] #'DPPPicker', 'DPPDetector',
+        model_names = ['PhaseNet', 'EQTransformer', 'BasicPhase', 'GPD'] #'DPPPicker', 'DPPDetector',
     else:
         model_names = model_name.split(',')
     training_dataset = args.train_dataset
