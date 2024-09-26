@@ -44,37 +44,30 @@ if __name__ == '__main__':
     target_path = 'evaluation/eval_tasks/' + args.target_dataset
 
     model_name = args.model_name
+    model_name = model_name.replace(' ', '')
+    if model_name == 'all':
+        model_names = ['PhaseNet', 'EQTransformer', 'GPD', 'BasicPhase'] #'DPPPicker', 'DPPDetector',
+    else:
+        model_names = model_name.split(',')
     training_dataset = args.train_dataset
 
-    all_models = ['PhaseNet', 'EQTransformer', 'GPD', 'BasicPhase'] #'DPPPicker', 'DPPDetector',
-
     #model = PhasePickerLit(ckpt_path=None, pretrained_name=model_name, pretrained_dataset=training_dataset)
-    if model_name == 'all':
-        for m in all_models:
-            print('*' * 32)
-            print(f'\nEvaluating model: {m}')
-            print('*' * 32, '\n')
 
-            model = get_pretrained_model(m, training_dataset=training_dataset)
+    for m in model_names:
+        print('*' * 32)
+        print(f'\nEvaluating model: {m}')
+        print('*' * 32, '\n')
 
-            pe.save_pick_predictions(
-                model=model,
-                target_path=target_path,
-                ckpt_path=f'pretrained_benchmark/{model_name}',
-                sets=sets,
-                save_tag='eval',
-                batch_size=64,
-                num_workers=args.num_workers
-            )
-    else:
-        model = get_pretrained_model(model_name, training_dataset=training_dataset)
+        model = get_pretrained_model(m, training_dataset=training_dataset)
+
         pe.save_pick_predictions(
             model=model,
             target_path=target_path,
-            ckpt_path=f'pretrained_benchmark/{model_name}',
+            ckpt_path=f'pretrained_benchmark/{m}',
             sets=sets,
             save_tag='eval',
             batch_size=64,
             num_workers=args.num_workers
         )
+
 
