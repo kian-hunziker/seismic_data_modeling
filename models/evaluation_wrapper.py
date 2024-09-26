@@ -195,7 +195,7 @@ class PhasePickerLit(SeisBenchModuleLit):
             local_pred = pred[i, start_sample:end_sample, :]
 
             score_detection[i] = torch.max(1 - local_pred[:, -1])
-            score_p_or_s[i] = torch.max(local_pred[:, 0] / torch.max(local_pred[:, 1]))
+            score_p_or_s[i] = torch.max(local_pred[:, 0]) / torch.max(local_pred[:, 1])
             p_sample[i] = torch.argmax(local_pred[:, 0])
             s_sample[i] = torch.argmax(local_pred[:, 1])
         return score_detection, score_p_or_s, p_sample, s_sample
