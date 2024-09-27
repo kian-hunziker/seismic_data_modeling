@@ -38,6 +38,7 @@ class SimpleSeqModel(pl.LightningModule):
         self.d_data = d_data
 
         if config.model.get('pretrained', None) is not None:
+            print('\nLoading pretrained model\n')
             ckpt, _ = load_checkpoint(config.train.pretrained)
             self.model = ckpt.model
         else:
@@ -49,11 +50,13 @@ class SimpleSeqModel(pl.LightningModule):
             d_model = 0
 
         if config.encoder.get('pretrained', None) is not None:
+            print('\nLoading pretrained encoder\n')
             self.encoder = ckpt.encoder
         else:
             self.encoder = instantiate_encoder_simple(self.hparams.encoder, d_data=self.d_data, d_model=d_model)
 
         if config.decoder.get('pretrained', None) is not None:
+            print('\nLoading pretrained decoder\n')
             self.decoder = ckpt.decoder
         else:
             self.decoder = instantiate_decoder_simple(self.hparams.decoder, d_data=self.d_data, d_model=d_model)
