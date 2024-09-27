@@ -39,7 +39,7 @@ class SimpleSeqModel(pl.LightningModule):
 
         if config.model.get('pretrained', None) is not None:
             print('\nLoading pretrained model\n')
-            ckpt, _ = load_checkpoint(config.train.pretrained)
+            ckpt, _ = load_checkpoint(config.model.pretrained)
             self.model = ckpt.model
         else:
             self.model = instantiate(registry.model, self.hparams.model)
