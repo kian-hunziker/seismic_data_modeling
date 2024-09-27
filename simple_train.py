@@ -17,10 +17,7 @@ from pytorch_lightning.utilities.model_summary import ModelSummary, LayerSummary
 import torch
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from dataloaders.MNISTdataloader import MNISTdataset
-from dataloaders.simple_waveform import SineWaveLightningDataset
-from models.simple_test_models import ConvNet
+
 from tasks.encoders import instantiate_encoder, load_encoder_from_file, instantiate_encoder_simple
 from tasks.decoders import instantiate_decoder, load_decoder_from_file, instantiate_decoder_simple
 from tasks.task import task_registry
@@ -256,7 +253,6 @@ def main(config: OmegaConf) -> None:
 
         trainer = create_trainer(config)
 
-
         preload = config.dataset.get('_name_') in registry.preloadable_datasets
         if preload:
             dataset = instantiate(registry.dataset, config.dataset, preload=preload)
@@ -298,6 +294,15 @@ def main(config: OmegaConf) -> None:
         else:
             model = SimpleSeqModel(config, d_data=d_data)
 
+        if config.train.get('seq_warmup', None) is not None:
+            seq_warmup = True
+            final_sample_len = config.train.get('final_sample_len', 4096)
+            final_batch_size = config.train.get('final_batch_size', 128)
+            num_epochs_warmup = config.train.get('num_epochs_warmup', 2)
+            min_seq_len = config.train.get('min_seq_len', 256)
+        else:
+            seq_warmup = False
+
         summary = ModelSummary(model, max_depth=1)
         print('\n', '*' * 32, '\n')
         print('SUMMARY')
@@ -312,7 +317,83 @@ def main(config: OmegaConf) -> None:
         print(model.decoder)
         print('*' * 32, '\n\n')
 
-        trainer.fit(model, train_loader, val_loader)
+        ############################
+        # fit the model
+        ############################
+
+        if seq_warmup is False:
+            # fit model without sequence length warmup (standard)
+            trainer.fit(model, train_loader, val_loader)
+        else:
+            # sequence length warmup
+            # for now, the lr resets for every new batch size. Needs to be fixed, see below
+            print('\n', '*' * 32, '\n')
+            print('Start Training With Batch Size Warmup')
+            print('\n', '*' * 32, '\n')
+
+            # compute batch sizes and sequence lengths
+            sample_lengths = []
+            batch_sizes = []
+
+            b_size = final_batch_size
+            s_len = final_sample_len
+            while s_len >= min_seq_len:
+                sample_lengths.append(s_len)
+                batch_sizes.append(b_size)
+                b_size = b_size * 2
+                s_len = s_len // 2
+            batch_sizes = list(reversed(batch_sizes))
+            sample_lengths = list(reversed(sample_lengths))
+
+            # print batch sizes and sequence lengths
+            for i in range(len(batch_sizes)):
+                print(f'Batch Size: {batch_sizes[i] :3d}, Sample Length: {sample_lengths[i]:6d}')
+
+            # Main training loop
+            for i in range(len(batch_sizes)):
+                print('\n', '*' * 32, '\n')
+                if i == len(batch_sizes) - 1:
+                    n_epochs = config.trainer.max_epochs - (i + 1) * num_epochs_warmup
+                else:
+                    n_epochs = num_epochs_warmup
+                print(f'Train for {n_epochs} epochs. Batch_size {batch_sizes[i]}, seq_len: {sample_lengths[i]}')
+                print('\n', '*' * 32, '\n')
+
+                dataset.sample_len = sample_lengths[i]
+                dataset.setup()
+
+                # TODO: fix dataloader worker init fn. worker_seeding should only be used for seisbench data
+                train_loader = DataLoader(
+                    dataset.dataset_train,
+                    shuffle=True,
+                    worker_init_fn=worker_seeding,
+                    pin_memory=config.loader.pin_memory,
+                    num_workers=config.loader.num_workers,
+                    batch_size=batch_sizes[i],
+                )
+                val_loader = DataLoader(
+                    dataset.dataset_val,
+                    shuffle=False,
+                    worker_init_fn=worker_seeding,
+                    pin_memory=config.loader.pin_memory,
+                    num_workers=config.loader.num_workers,
+                    batch_size=batch_sizes[i],
+                )
+                # print(next(iter(train_loader))['X'].shape)
+                # print('len dataset.train', len(dataset.dataset_train))
+                # print('train_loader.batch_size', train_loader.batch_size)
+
+                # TODO: figure out why the lr is reset
+                if i > 0:
+                    model, _ = load_checkpoint('wandb_logs/MA/' + trainer.logger.version)
+                    # print('trainer.logger.version', trainer.logger.version)
+                    # trainer = create_trainer(config)
+                if i == len(batch_sizes) - 1:
+                    trainer.fit_loop.max_epochs = config.trainer.max_epochs  # - (i + 1) * num_epochs_warmup
+                else:
+                    trainer.fit_loop.max_epochs = (i + 1) * num_epochs_warmup
+                # print('trainer.fit_loop.max_epochs', trainer.fit_loop.max_epochs)
+                trainer.fit(model, train_loader, val_loader)
 
         print('\n', '*' * 32, '\n')
         print('DONE')
