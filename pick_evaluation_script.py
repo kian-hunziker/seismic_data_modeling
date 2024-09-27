@@ -26,7 +26,6 @@ if __name__ == '__main__':
         ckpt_path = '/'.join(ckpt_path.split('/')[:-2])
     target_path = 'evaluation/eval_tasks/' + args.target_dataset
 
-pe.save_pick_predictions(
     pe.save_pick_predictions(
         model=model,
         target_path=target_path,
