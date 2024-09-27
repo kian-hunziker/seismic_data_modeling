@@ -81,15 +81,15 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.d_data = d_data
         self.bits = bits
         self.preload = preload
+        if self.preload:
+            self.data = sbd.ETHZ(sampling_rate=100, cache='full')
+            self.data.preload_waveforms(pbar=True)
+        else:
+            self.data = sbd.ETHZ(sampling_rate=100)
         self.setup()
 
     def setup(self):
-        if self.preload:
-            data = sbd.ETHZ(sampling_rate=100, cache='full')
-            data.preload_waveforms(pbar=True)
-        else:
-            data = sbd.ETHZ(sampling_rate=100)
-        train, dev, test = data.train_dev_test()
+        train, dev, test = self.data.train_dev_test()
 
         augmentations = [
             sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=self.sample_len, windowlen=2 * self.sample_len,
@@ -138,15 +138,15 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         self.preload = preload
         self.sample_boundaries = sample_boundaries
         self.sigma = sigma
+        if self.preload:
+            self.data = sbd.ETHZ(sampling_rate=100, cache='full')
+            self.data.preload_waveforms(pbar=True)
+        else:
+            self.data = sbd.ETHZ(sampling_rate=100)
         self.setup()
 
     def setup(self):
-        if self.preload:
-            data = sbd.ETHZ(sampling_rate=100, cache='full')
-            data.preload_waveforms(pbar=True)
-        else:
-            data = sbd.ETHZ(sampling_rate=100)
-        train, dev, test = data.train_dev_test()
+        train, dev, test = self.data.train_dev_test()
 
         augmentations = [
             # In 2/3 of the cases, select windows around picks, to reduce amount of noise traces in training.
