@@ -3,6 +3,7 @@
 
 ## Data
 dataloaders/data/*
+pretrained_benchmark/*
 
 ## jupyter notebooks
 notebooks/*
