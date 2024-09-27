@@ -37,13 +37,26 @@ class SimpleSeqModel(pl.LightningModule):
         self.save_hyperparameters(config)
         self.d_data = d_data
 
-        self.model = instantiate(registry.model, self.hparams.model)
+        if config.model.get('pretrained', None) is not None:
+            ckpt, _ = load_checkpoint(config.train.pretrained)
+            self.model = ckpt.model
+        else:
+            self.model = instantiate(registry.model, self.hparams.model)
+
         try:
             d_model = self.hparams.model.d_model
         except:
             d_model = 0
-        self.encoder = instantiate_encoder_simple(self.hparams.encoder, d_data=self.d_data, d_model=d_model)
-        self.decoder = instantiate_decoder_simple(self.hparams.decoder, d_data=self.d_data, d_model=d_model)
+
+        if config.encoder.get('pretrained', None) is not None:
+            self.encoder = ckpt.encoder
+        else:
+            self.encoder = instantiate_encoder_simple(self.hparams.encoder, d_data=self.d_data, d_model=d_model)
+
+        if config.decoder.get('pretrained', None) is not None:
+            self.decoder = ckpt.decoder
+        else:
+            self.decoder = instantiate_decoder_simple(self.hparams.decoder, d_data=self.d_data, d_model=d_model)
 
         self.task = instantiate(task_registry, self.hparams.task)
         self.criterion = self.task.loss
