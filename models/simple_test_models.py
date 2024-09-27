@@ -6,7 +6,7 @@ import os
 
 
 class IdentityModel(nn.Module):
-    def __init__(self):
+    def __init__(self, d_model=None):
         super(IdentityModel, self).__init__()
 
     def forward(self, x, state=None):
