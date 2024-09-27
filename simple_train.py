@@ -41,6 +41,11 @@ class SimpleSeqModel(pl.LightningModule):
             print('\nLoading pretrained model\n')
             ckpt, _ = load_checkpoint(config.model.pretrained)
             self.model = ckpt.model
+            # freeze model parameters
+            if config.model.get('freeze', None) is not None and config.model.get('freeze', False):
+                self.model.eval()
+                for param in self.model.parameters():
+                    param.requires_grad = False
         else:
             self.model = instantiate(registry.model, self.hparams.model)
 
@@ -52,12 +57,20 @@ class SimpleSeqModel(pl.LightningModule):
         if config.encoder.get('pretrained', None) is not None:
             print('\nLoading pretrained encoder\n')
             self.encoder = ckpt.encoder
+            if config.encoder.get('freeze', None) is not None and config.encoder.get('freeze', False):
+                self.encoder.eval()
+                for param in self.encoder.parameters():
+                    param.requires_grad = False
         else:
             self.encoder = instantiate_encoder_simple(self.hparams.encoder, d_data=self.d_data, d_model=d_model)
 
         if config.decoder.get('pretrained', None) is not None:
             print('\nLoading pretrained decoder\n')
             self.decoder = ckpt.decoder
+            if config.decoder.get('freeze', None) is not None and config.decoder.get('freeze', False):
+                self.decoder.eval()
+                for param in self.decoder.parameters():
+                    param.requires_grad = False
         else:
             self.decoder = instantiate_decoder_simple(self.hparams.decoder, d_data=self.d_data, d_model=d_model)
 
