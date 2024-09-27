@@ -7,6 +7,7 @@ import glob
 import numpy as np
 from pytorch_lightning.utilities.model_summary import ModelSummary
 from train import LightningSequenceModel
+from simple_train import SimpleSeqModel
 from dataloaders.data_utils.costa_rica_utils import get_metadata
 from models.sashimi.sashimi_standalone import Sashimi
 
@@ -18,7 +19,7 @@ def _extract_step_number(filename):
     return None
 
 
-def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False,) -> tuple[LightningSequenceModel, dict]:
+def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False, simple=False) -> tuple[LightningSequenceModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
     If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
@@ -59,7 +60,10 @@ def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bo
         name = hparams['experiment_name']
         print(f'Experiment name: {name}')
 
-    model = LightningSequenceModel.load_from_checkpoint(checkpoint_path, map_location=location)
+    if simple:
+        model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
+    else:
+        model = LightningSequenceModel.load_from_checkpoint(checkpoint_path, map_location=location)
     if return_path:
         return model, hparams, checkpoint_path
     else:
