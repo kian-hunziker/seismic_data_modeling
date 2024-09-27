@@ -19,9 +19,14 @@ if __name__ == '__main__':
 
     sets = 'train,dev,test'
     ckpt_path = args.checkpoint
-    target_path = 'evaluation/eval_tasks/' + args.target_dataset
 
     model = PhasePickerLit(ckpt_path)
+
+    if '.ckpt' in ckpt_path:
+        ckpt_path = '/'.join(ckpt_path.split('/')[:-2])
+    target_path = 'evaluation/eval_tasks/' + args.target_dataset
+
+pe.save_pick_predictions(
     pe.save_pick_predictions(
         model=model,
         target_path=target_path,
