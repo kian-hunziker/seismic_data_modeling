@@ -135,7 +135,7 @@ class PhasePickerLit(SeisBenchModuleLit):
                 self.sample_len = 6000
         else:
             self.pretrained_benchmark = False
-            pl_module, hparams, specific_ckpt = load_checkpoint(ckpt_path, location=device, return_path=True)
+            pl_module, hparams, specific_ckpt = load_checkpoint(ckpt_path, location=device, return_path=True, simple=True)
             try:
                 self.sample_len = hparams['dataset']['sample_len']
             except:
