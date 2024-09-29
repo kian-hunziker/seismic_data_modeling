@@ -134,7 +134,7 @@ class AudioDatasetLit(SequenceDataset):
             train='test'
         )
         self.d_data = self.dataset_train.channels
-        #self.split_train_val(self.hparams.val_split)
+        self.split_train_val(self.hparams.val_split)
         self.num_classes = len(class_dict)
 
 
