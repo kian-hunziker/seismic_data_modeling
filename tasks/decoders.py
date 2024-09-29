@@ -252,6 +252,24 @@ class PhasePickDecoder(nn.Module):
             return self.linear(x)
 
 
+class SequenceClassifier(nn.Module):
+    def __init__(self, in_features, out_features,  num_classes, mode='avg'):
+        super(SequenceClassifier, self).__init__()
+        self.mode = mode
+        self.linear = nn.Linear(in_features, num_classes)
+
+    def forward(self, x, state=None):
+        if self.mode == 'avg':
+            x = torch.mean(x, dim=1)
+            x = self.linear(x)
+        elif self.mode == 'last':
+            x = x[:, -1, :]
+            x = self.linear(x)
+        else:
+            print(f'Unknown mode: {self.mode}')
+        return x
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -259,7 +277,8 @@ dec_registry = {
     's4-decoder': S4Decoder,
     'pool': UpPoolDecoder,
     'embedding': EmbeddingDecoder,
-    'phase-pick': PhasePickDecoder
+    'phase-pick': PhasePickDecoder,
+    'sequence-classifier': SequenceClassifier,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
