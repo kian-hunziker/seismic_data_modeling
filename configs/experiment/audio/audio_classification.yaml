@@ -1,0 +1,69 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: audio
+  - /task: classification
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: sashimi #mamba_sashimi
+
+experiment_name: audio_classification_sash
+
+optimizer:
+  weight_decay: 0
+
+model:
+  d_model: 16
+  n_layers: 3
+  expand: 2
+  ff: 2
+  pool:
+    - 4
+    - 4
+  dropout: 0.0
+  bidirectional: True
+  unet: False
+  mode: diag
+
+
+train:
+  monitor: val/loss
+  mode: min
+  #seq_warmup: True
+  #final_sample_len: 4096
+  #final_batch_size: 2
+  #min_seq_len: 512
+  #num_epochs_warmup: 1
+  #pretrained_model: wandb_logs/MA/2024-09-27__12_41_07
+
+dataset:
+  sample_len: 16384
+  sample_rate: 16000
+  auto_reg: False
+  channels: 1
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: sequence-classifier
+  mode: avg
+  num_classes: 6
+
+loader:
+  batch_size: 8
+  drop_last: True
+
+# audio dataset currently has 3964 train examples
+scheduler:
+  num_warmup_steps: 600
+  num_training_steps: 6000
+
+trainer:
+  max_steps: 6000
+  max_epochs: 1000
+  #limit_train_batches: 0.5
+  log_every_n_steps: 1
+  #gradient_clip_val: 1.0
