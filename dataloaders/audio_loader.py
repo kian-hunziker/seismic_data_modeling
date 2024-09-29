@@ -17,6 +17,12 @@ from tqdm import tqdm
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
 
+# use the command below to delete ableton live files from dataset (from root folder).
+# test by leaving out the -delete
+# find . -name "*.asd" -type f -delete
+#
+
+
 class_dict = {
     0: '808',
     1: 'Clap',
@@ -94,7 +100,10 @@ class AudioDataset(Dataset):
             z = torch.zeros(diff, sample.shape[1])
             x_plus_one = torch.cat((sample, z))
         else:
-            start_idx = torch.randint(low=0, high=sample.shape[0] - self.sample_len - 1, size=(1,)).item()
+            if self.train == 'train':
+                start_idx = torch.randint(low=0, high=sample.shape[0] - self.sample_len - 1, size=(1,)).item()
+            else:
+                start_idx = 0
             x_plus_one = sample[start_idx:start_idx + self.sample_len + 1]
 
         x = x_plus_one[:self.sample_len]
@@ -215,7 +224,7 @@ def audio_lit_test(auto_reg=False):
         'num_workers': 0,
     }
     dataset = AudioDatasetLit(data_dir=data_dir, **data_config)
-    loader = dataset.test_dataloader(**loader_config)
+    loader = dataset.train_dataloader(**loader_config)
 
     x, y = next(iter(loader))
     x, labels = x
@@ -234,7 +243,7 @@ def audio_lit_test(auto_reg=False):
         plt.show()
         plt.close()
 
-    for i, batch in enumerate(tqdm(loader)):
+    for i, batch in enumerate(loader):
         x, y = batch
         x, labels = x
         print(torch.nn.functional.mse_loss(x, y))
