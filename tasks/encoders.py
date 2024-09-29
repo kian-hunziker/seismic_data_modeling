@@ -310,6 +310,22 @@ class DownPoolClassEncoder(nn.Module):
         return x.unsqueeze(-1)
 
 
+class ConditionalLinearEncoder(nn.Module):
+    def __init__(self, in_features, out_features, num_classes):
+        super(ConditionalLinearEncoder, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.num_classes = num_classes
+        self.linear1 = nn.Linear(in_features, out_features)
+        self.embedding = nn.Embedding(num_classes, out_features)
+
+    def forward(self, x):
+        samples, labels = x
+        samples = self.linear1(samples)
+        embeddings = self.embedding(samples.squeeze(-1)).unsqueeze(1)
+        return samples + embeddings
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
@@ -321,6 +337,7 @@ enc_registry = {
     'pool': DownPoolEncoder,
     'learned-classes': DownPoolClassEncoder,
     's4-class': S4ClassEncoder,
+    'conditional-linear': ConditionalLinearEncoder,
 }
 
 pretrain_encoders = ['transformer, s4-encoder', 'pool', 'learned-classes', 's4-class']
