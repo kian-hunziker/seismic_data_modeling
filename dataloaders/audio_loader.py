@@ -13,6 +13,7 @@ from scipy.signal import decimate
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SequenceDataset
 from evaluation.eval_sashimi import moving_average
+from tqdm import tqdm
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
 
@@ -68,7 +69,10 @@ class AudioDataset(Dataset):
         return len(self.file_paths)
 
     def __getitem__(self, idx):
-        sample, sample_rate = load(self.file_paths[idx][1], normalize=True, channels_first=False)
+        try:
+            sample, sr = load(self.file_paths[idx][1], normalize=True, channels_first=False)
+        except:
+            print(self.file_paths[idx][1])
         label = self.file_paths[idx][0].long()
         # hacky conversion mono to stereo and vice versa
         if self.channels == 1:
@@ -79,7 +83,9 @@ class AudioDataset(Dataset):
             if sample.shape[1] == 1:
                 sample = sample.squeeze(1)
                 sample = torch.stack((sample, sample), dim=-1)
-        sample = torchaudio.functional.resample(sample, orig_freq=sample_rate, new_freq=self.sample_rate)
+
+        if sr != self.sample_rate:
+            sample = torchaudio.functional.resample(sample.transpose(0, 1), orig_freq=sr, new_freq=self.sample_rate).transpose(0, 1)
 
         if sample.dim() == 1:
             sample = sample.unsqueeze(-1)
@@ -128,7 +134,7 @@ class AudioDatasetLit(SequenceDataset):
             train='test'
         )
         self.d_data = self.dataset_train.channels
-        self.split_train_val(self.hparams.val_split)
+        #self.split_train_val(self.hparams.val_split)
         self.num_classes = len(class_dict)
 
 
@@ -197,19 +203,19 @@ def audio_lit_test(auto_reg=False):
 
     data_dir = 'data/audio'
     data_config = {
-        'sample_len': 16000,
-        'sample_rate': 16000,
+        'sample_len': 44128,
+        'sample_rate': 44100,
         'channels': 2,
         'auto_reg': auto_reg,
         'val_split': 0.1,
         'return_labels': True
     }
     loader_config = {
-        'batch_size': 4,
+        'batch_size': 64,
         'num_workers': 0,
     }
     dataset = AudioDatasetLit(data_dir=data_dir, **data_config)
-    loader = dataset.train_dataloader(**loader_config)
+    loader = dataset.test_dataloader(**loader_config)
 
     x, y = next(iter(loader))
     x, labels = x
@@ -218,7 +224,7 @@ def audio_lit_test(auto_reg=False):
     print('labels.shape: ', labels.shape)
     print(f'num classes: {dataset.num_classes}')
 
-    for i in range(x.shape[0]):
+    for i in range(4):
         plt.plot(x[i])
         if auto_reg:
             plt.plot(y[i])
@@ -227,6 +233,11 @@ def audio_lit_test(auto_reg=False):
             plt.title(class_dict[y[i, 0].item()])
         plt.show()
         plt.close()
+
+    for i, batch in enumerate(tqdm(loader)):
+        x, y = batch
+        x, labels = x
+        print(torch.nn.functional.mse_loss(x, y))
 
 
 if __name__ == '__main__':
