@@ -322,7 +322,7 @@ class ConditionalLinearEncoder(nn.Module):
     def forward(self, x):
         samples, labels = x
         samples = self.linear1(samples)
-        embeddings = self.embedding(samples.squeeze(-1)).unsqueeze(1)
+        embeddings = self.embedding(labels.squeeze(-1)).unsqueeze(1)
         return samples + embeddings
 
 
