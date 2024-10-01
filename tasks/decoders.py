@@ -253,7 +253,7 @@ class PhasePickDecoder(nn.Module):
 
 
 class SequenceClassifier(nn.Module):
-    def __init__(self, in_features, out_features,  num_classes, mode='avg'):
+    def __init__(self, in_features, out_features, num_classes, mode='avg'):
         super(SequenceClassifier, self).__init__()
         self.mode = mode
         self.linear = nn.Linear(in_features, num_classes)
@@ -270,6 +270,37 @@ class SequenceClassifier(nn.Module):
         return x
 
 
+class CausalDecoder(nn.Module):
+    def __init__(self, in_features, out_features, kernel_size=16):
+        super(CausalDecoder, self).__init__()
+        self.kernel_size = kernel_size
+
+        # Define 1D convolution with 1 input channel, 1 output channel, and kernel_size
+        self.conv = nn.Conv1d(
+            in_channels=in_features, out_channels=out_features, kernel_size=kernel_size, padding=kernel_size - 1,
+            bias=False
+        )
+
+    def forward(self, x, state=None):
+        # x: [B, L, D_in] then output: [B, L, D_out] (for training)
+        # at inference time: x is [B, D_in], state [B, L, D_in], output [B, D_out]
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # Add the channel dimension: [batch_size, 1, seq_len]
+
+        if state is not None:
+            x = torch.cat((state, x), dim=1)
+
+        # Apply the causal convolution
+        x = x.transpose(1, 2)
+        out = self.conv(x)[:, :, :-(self.kernel_size - 1)]
+        out = out.transpose(1, 2)
+
+        if state is not None:
+            out = out[:, -1, :]
+        # Remove the extra channel dimension: [batch_size, seq_len]
+        return out.squeeze(1)
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -279,6 +310,7 @@ dec_registry = {
     'embedding': EmbeddingDecoder,
     'phase-pick': PhasePickDecoder,
     'sequence-classifier': SequenceClassifier,
+    'causal-decoder': CausalDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
