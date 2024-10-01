@@ -381,7 +381,9 @@ class Sashimi(nn.Module):
             if self.unet:
                 for i in range(skipped):
                     next_state.append(state.pop())
-                u_layers = list(self.u_layers)[skipped//3:]
+                # TODO: double check
+                u_layers = list(self.u_layers)[skipped//(len(self.u_layers[0]) - 1):]
+                #u_layers = list(self.u_layers)[skipped//3:]
             else:
                 for i in range(skipped):
                     for _ in range(len(self.u_layers[i])):
