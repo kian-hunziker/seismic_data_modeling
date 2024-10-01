@@ -326,6 +326,7 @@ class MambaSashimi(nn.Module):
                 expand=2,
                 layer_idx=layer_idx,
                 complex=self.complex,
+                dropout=dropout,
                 dt_rank=dt_rank
             )
             norm_cls = partial(RMSNorm, eps=1e-5)

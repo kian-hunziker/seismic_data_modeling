@@ -49,6 +49,7 @@ class MambaComplex(nn.Module):
             device=None,
             dtype=None,
             complex=False,
+            dropout=0.0,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -63,6 +64,7 @@ class MambaComplex(nn.Module):
         self.complex = complex
 
         self.in_proj = nn.Linear(self.d_model, self.d_inner * 2, bias=bias, **factory_kwargs)
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
         self.conv1d = nn.Conv1d(
             in_channels=self.d_inner,
@@ -242,7 +244,11 @@ class MambaComplex(nn.Module):
                 y, last_state = y
                 ssm_state.copy_(last_state)
             y = rearrange(y, "b d l -> b l d")
+
             out = self.out_proj(y)
+
+            # dropout only in forward, as step function is only used during inference
+            out = self.dropout(out)
         return out
 
     def step(self, hidden_states, conv_state, ssm_state):
