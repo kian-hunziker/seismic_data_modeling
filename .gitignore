@@ -4,6 +4,7 @@
 ## Data
 dataloaders/data/*
 pretrained_benchmark/*
+generated_audio/*
 
 ## jupyter notebooks
 notebooks/*
