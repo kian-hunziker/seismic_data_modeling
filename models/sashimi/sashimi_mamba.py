@@ -279,7 +279,7 @@ class MambaSashimi(nn.Module):
             bidirectional=False,
             unet=False,
             dropout=0.0,
-            complex=False,
+            is_complex=False,
             simple_up_down=False,
             d_conv=4,
             **s4_args,
@@ -311,13 +311,13 @@ class MambaSashimi(nn.Module):
         self.d_output = H
         self.d_conv = d_conv
         self.unet = unet
-        self.complex = complex
+        self.is_complex = is_complex
         self.n_layers = n_layers
 
         def mamba_block(dim, layer_idx):
             # make sure, the dt_rank is divisible by 2 which is required to make complex step function work
             dt_rank = math.ceil(dim / 16)
-            if self.complex and dt_rank % 2 != 0:
+            if self.is_complex and dt_rank % 2 != 0:
                 dt_rank += 1
             mixer_cls = partial(
                 MambaComplex,
@@ -325,7 +325,7 @@ class MambaSashimi(nn.Module):
                 d_conv=self.d_conv,
                 expand=2,
                 layer_idx=layer_idx,
-                complex=self.complex,
+                is_complex=self.is_complex,
                 dropout=dropout,
                 dt_rank=dt_rank
             )

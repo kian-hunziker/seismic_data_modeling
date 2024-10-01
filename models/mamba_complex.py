@@ -48,7 +48,7 @@ class MambaComplex(nn.Module):
             layer_idx=None,
             device=None,
             dtype=None,
-            complex=False,
+            is_complex=False,
             dropout=0.0,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
@@ -61,7 +61,7 @@ class MambaComplex(nn.Module):
         self.dt_rank = math.ceil(self.d_model / 16) if dt_rank == "auto" else dt_rank
         self.use_fast_path = use_fast_path
         self.layer_idx = layer_idx
-        self.complex = complex
+        self.is_complex = is_complex
 
         self.in_proj = nn.Linear(self.d_model, self.d_inner * 2, bias=bias, **factory_kwargs)
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
@@ -79,7 +79,7 @@ class MambaComplex(nn.Module):
         self.activation = "silu"
         self.act = nn.SiLU()
 
-        if self.complex:
+        if self.is_complex:
             projection_dim = 4
         else:
             projection_dim = 2
@@ -109,7 +109,7 @@ class MambaComplex(nn.Module):
         # Our initialization would set all Linear.bias to zero, need to mark this one as _no_reinit
         self.dt_proj.bias._no_reinit = True
 
-        if self.complex:
+        if self.is_complex:
             # S4D lin initialization for complex case
             A_real = repeat(
                 torch.ones(self.d_state, dtype=torch.float32, device=device) * 0.5,
@@ -169,7 +169,7 @@ class MambaComplex(nn.Module):
         if self.in_proj.bias is not None:
             xz = xz + rearrange(self.in_proj.bias.to(dtype=xz.dtype), "d -> d 1")
 
-        if self.complex:
+        if self.is_complex:
             # COMPLEX:
             A = -torch.exp(self.A_log_real.float()) + 1j * self.A_imag.float()
         else:
@@ -216,7 +216,7 @@ class MambaComplex(nn.Module):
             # and L as the fastest moving dimension, since those are what the ssm_scan kernel expects.
             x_dbl = self.x_proj(rearrange(x, "b d l -> (b l) d"))  # (bl d)
 
-            if self.complex:
+            if self.is_complex:
                 dt, B, C = torch.split(x_dbl, [self.dt_rank, 2 * self.d_state, 2 * self.d_state], dim=-1)
                 B = rearrange(B, "(b l) (dstate two) -> b 1 dstate (l two)", l=seqlen, two=2).contiguous()
                 C = rearrange(C, "(b l) (dstate two) -> b 1 dstate (l two)", l=seqlen, two=2).contiguous()
@@ -284,7 +284,7 @@ class MambaComplex(nn.Module):
 
         x_db = self.x_proj(x)  # (B dt_rank+2*d_state)
 
-        if self.complex:
+        if self.is_complex:
             dt, B, C = torch.split(x_db, [self.dt_rank, 2 * self.d_state, 2 * self.d_state], dim=-1)
             B = torch.view_as_complex(rearrange(B.float(), "... (L two) -> ... L two", two=2))
             C = torch.view_as_complex(rearrange(C.float(), "... (L two) -> ... L two", two=2))
@@ -294,7 +294,7 @@ class MambaComplex(nn.Module):
         # Don't add dt_bias here
         dt = F.linear(dt, self.dt_proj.weight)  # (B d_inner)
 
-        if self.complex:
+        if self.is_complex:
             # COMPLEX:
             A = -torch.exp(self.A_log_real.float()) + 1j * self.A_imag.float()
         else:
@@ -302,14 +302,14 @@ class MambaComplex(nn.Module):
             A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
 
         # SSM step
-        if self.complex or selective_state_update is None:
+        if self.is_complex or selective_state_update is None:
             # Discretize A and B
             dt = F.softplus(dt + self.dt_proj.bias.to(dtype=dt.dtype))
             dA = torch.exp(torch.einsum("bd,dn->bdn", dt, A))
             dB = torch.einsum("bd,bn->bdn", dt, B)
             ssm_state.copy_(ssm_state * dA + rearrange(x, "b d -> b d 1") * dB)
 
-            if self.complex:
+            if self.is_complex:
                 comp_type = torch.complex64
             else:
                 comp_type = dtype
@@ -338,7 +338,7 @@ class MambaComplex(nn.Module):
         )
         # ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
         # ssm_dtype = torch.float32
-        if self.complex:
+        if self.is_complex:
             ssm_dtype = torch.complex64
         else:
             ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
@@ -364,7 +364,7 @@ class MambaComplex(nn.Module):
                 self.d_model * self.expand,
                 self.d_state,
                 device=self.dt_proj.weight.device,
-                dtype=torch.complex64 if self.complex else self.dt_proj.weight.dtype,
+                dtype=torch.complex64 if self.is_complex else self.dt_proj.weight.dtype,
                 # dtype=torch.float32,
             )
             inference_params.key_value_memory_dict[self.layer_idx] = (conv_state, ssm_state)
