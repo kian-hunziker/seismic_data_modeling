@@ -1,0 +1,15 @@
+_name_: hybrid-sashimi
+d_model: 64
+n_layers: 5
+outermost_s4: True
+expand: 2
+ff: 0
+pool:
+  - 16
+  - 16
+dropout: 0.0
+unet: False
+complex: False
+d_conv: 4
+
+#mode: diag

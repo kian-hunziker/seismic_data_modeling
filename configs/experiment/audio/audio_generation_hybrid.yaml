@@ -1,0 +1,66 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: audio
+  - /task: regression
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: hybrid_sashimi
+
+experiment_name: audio_generation_hybrid
+
+model:
+  d_model: 64
+  n_layers: 7
+  outermost_s4: True
+  expand: 2
+  ff: 0
+  pool:
+    - 4
+    - 4
+    - 4
+  dropout: 0.0
+  unet: False
+  d_conv: 4
+  complex: True
+
+train:
+  monitor: val/loss
+  mode: min
+  #ckpt_path: wandb_logs/MA/
+
+task:
+  metrics:
+    - log_mse
+    - mse
+
+dataset:
+  sample_len: 33768
+  sample_rate: 44100
+  auto_reg: True
+  return_labels: False
+  channels: 2
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: causal-decoder
+  kernel_size: 256
+
+loader:
+  batch_size: 16
+  drop_last: True
+
+# audio dataset currently has 3964 train examples
+
+scheduler:
+  num_warmup_steps: 4020
+  num_training_steps: 40200
+
+trainer:
+  max_steps: 40200
+  max_epochs: 600
+  gradient_clip_val: 1.0
