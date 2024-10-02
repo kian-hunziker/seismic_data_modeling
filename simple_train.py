@@ -39,7 +39,19 @@ class SimpleSeqModel(pl.LightningModule):
 
         if config.model.get('pretrained', None) is not None:
             print('\nLoading pretrained model\n')
-            ckpt, _ = load_checkpoint(config.model.pretrained)
+
+            # extract checkpoint path
+            ckpt_path = config.model.pretrained
+
+            # look for updated model parameters
+            # for example: updated dropout value for fine-tuning
+            if config.get('model_update', None) is not None:
+                update_configs = config.model_update
+                ckpt, _ = load_checkpoint(ckpt_path, updated_model_config=update_configs, d_data=d_data)
+            else:
+                ckpt, _ = load_checkpoint(config.model.pretrained)
+
+            # extract main model from checkpoint
             self.model = ckpt.model
             # freeze model parameters
             if config.model.get('freeze', None) is not None and config.model.get('freeze', False):
@@ -223,8 +235,13 @@ def _extract_step_number(filename):
     return None
 
 
-def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False) -> tuple[
-    SimpleSeqModel, dict]:
+def load_checkpoint(
+        checkpoint_path: str,
+        location: str = 'cpu',
+        return_path: bool = False,
+        updated_model_config: OmegaConf= None,
+        d_data: int = 3,
+) -> tuple[SimpleSeqModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
     If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
@@ -263,7 +280,13 @@ def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bo
         name = hparams['experiment_name']
         print(f'Experiment name: {name}')
 
-    model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
+    if updated_model_config is not None:
+        full_config = OmegaConf.create(hparams)
+        full_config.model.update(updated_model_config)
+        model = SimpleSeqModel(full_config, d_data=d_data)
+        model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
+    else:
+        model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
     if return_path:
         return model, hparams, checkpoint_path
     else:
