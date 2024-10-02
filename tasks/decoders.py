@@ -230,11 +230,21 @@ class EmbeddingDecoder(nn.Module):
 
 
 class PhasePickDecoder(nn.Module):
-    def __init__(self, d_model, output_dim=3, convolutional=False, kernel_size=33):
+    def __init__(self, d_model, output_dim=3, convolutional=False, kernel_size=33, dropout=0.0):
+        """
+        Decoder for phase picking tasks
+        :param d_model: dimension of model backbone
+        :param output_dim: dimension of output, for phase picking this is usually 3
+        :param convolutional: If true, use a Conv1d with kernel size 'kernel_size'. Else, use a linear layer.
+        :param kernel_size: Size of the convolutional kernel. Must be uneven!
+        :param dropout: input dropout rate
+        """
         super(PhasePickDecoder, self).__init__()
         self.convolutional = convolutional
 
         if self.convolutional:
+            assert kernel_size % 2 == 1, 'Kernel size must be uneven'
+
             self.conv = nn.Conv1d(
                 in_channels=d_model,
                 out_channels=output_dim,
@@ -245,7 +255,10 @@ class PhasePickDecoder(nn.Module):
         else:
             self.linear = nn.Linear(d_model, output_dim)
 
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+
     def forward(self, x, state=None):
+        x = self.dropout(x)
         if self.convolutional:
             return self.conv(x.transpose(1, 2)).transpose(1, 2)
         else:
