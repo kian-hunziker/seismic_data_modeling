@@ -10,6 +10,7 @@ from train import LightningSequenceModel
 from simple_train import SimpleSeqModel
 from dataloaders.data_utils.costa_rica_utils import get_metadata
 from models.sashimi.sashimi_standalone import Sashimi
+from omegaconf import OmegaConf
 
 
 def _extract_step_number(filename):
@@ -19,7 +20,13 @@ def _extract_step_number(filename):
     return None
 
 
-def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bool = False, simple=False) -> tuple[LightningSequenceModel, dict]:
+def load_checkpoint(
+        checkpoint_path: str,
+        location: str = 'cpu',
+        return_path: bool = False,
+        simple: bool = False,
+        d_data: int = 3,
+) -> tuple[LightningSequenceModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
     If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
@@ -27,6 +34,8 @@ def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bo
     :param return_path: if true, the path to the checkpoint will be returned
     :param location: device to map the checkpoint to (e.g. cuda or cpu). Defaults to 'cpu'
     :param checkpoint_path: path to checkpoint file. The hparams file is extracted automatically
+    :param simple: Load SimpleSeqModel
+    :param d_data: Data dimension for loading SimpleSeqModel, default is 3
     :return: LightningSequenceModel, hparams
     """
     if not checkpoint_path.endswith('.ckpt'):
@@ -61,7 +70,8 @@ def load_checkpoint(checkpoint_path: str, location: str = 'cpu', return_path: bo
         print(f'Experiment name: {name}')
 
     if simple:
-        model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
+        model = SimpleSeqModel(OmegaConf.create(hparams), d_data=d_data)
+        model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
     else:
         model = LightningSequenceModel.load_from_checkpoint(checkpoint_path, map_location=location)
     if return_path:
