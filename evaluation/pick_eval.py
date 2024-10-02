@@ -171,6 +171,121 @@ def save_pick_predictions(
             task_targets.to_csv(pred_path, index=False)
 
 
+def save_latent_spaces(
+        model: L.LightningModule,
+        target_path: str,
+        ckpt_path: str,
+        sets: str,
+        save_tag: str,
+        batch_size: int = 1024,
+        num_workers: int = 4,
+        sampling_rate: Optional[int] = None,
+) -> None:
+    targets = Path(target_path)
+    sets = sets.split(",")
+    model.eval()
+
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = True
+
+    dataset = get_dataset_by_name(targets.name)(
+        sampling_rate=100, component_order="ZNE", dimension_order="NCW",
+        cache="full"
+    )
+
+    if sampling_rate is not None:
+        dataset.sampling_rate = sampling_rate
+        # pred_root = pred_root + "_resampled"
+        # weight_path_name = weight_path_name + f"_{sampling_rate}"
+
+    for eval_set in sets:
+        split = dataset.get_split(eval_set)
+        if targets.name == "InstanceCountsCombined":
+            print(
+                "Overwriting noise trace_names to allow correct identification"
+            )
+            # Replace trace names for noise entries
+            split._metadata["trace_name"].values[
+            -len(split.datasets[-1]):
+            ] = split._metadata["trace_name"][-len(split.datasets[-1]):].apply(
+                lambda x: "noise_" + x
+            )
+            split._build_trace_name_to_idx_dict()
+
+        print(f"Starting set {eval_set}")
+        split.preload_waveforms(pbar=True)
+
+        for task in ["1"]:
+
+            task_csv = targets / f"task{task}.csv"
+
+            if not task_csv.is_file():
+                continue
+
+            print(f"Starting task {task}")
+
+            task_targets = pd.read_csv(task_csv)
+            task_targets = task_targets[task_targets["trace_split"] == eval_set]
+
+            if len(task_targets) == 0:
+                print(f'No targets found in set {eval_set} for task {task}')
+                continue
+
+            if task == "1" and targets.name == "InstanceCountsCombined":
+                border = _identify_instance_dataset_border(task_targets)
+                task_targets["trace_name"].values[border:] = task_targets["trace_name"][
+                                                             border:
+                                                             ].apply(lambda x: "noise_" + x)
+
+            if sampling_rate is not None:
+                for key in ["start_sample", "end_sample", "phase_onset"]:
+                    if key not in task_targets.columns:
+                        continue
+                    task_targets[key] = (
+                            task_targets[key]
+                            * sampling_rate
+                            / task_targets["sampling_rate"]
+                    )
+                task_targets[sampling_rate] = sampling_rate
+
+            generator = sbg.SteeredGenerator(split, task_targets)
+            generator.add_augmentations(model.get_eval_augmentations())
+
+            loader = DataLoader(
+                generator, batch_size=batch_size, shuffle=False, num_workers=num_workers
+            )
+
+            print(f'len loader: {len(loader)}')
+
+            acc = 'gpu' if torch.cuda.is_available() else 'cpu'
+            trainer = L.Trainer(
+                accelerator=acc,
+                devices=1,
+                logger=False,  # Disable the default logger
+                enable_checkpointing=False,  # Disable automatic checkpointing
+                #limit_predict_batches=0.01
+            )
+
+            predictions = trainer.predict(model, loader)
+            predictions_list = [p for p in torch.cat(predictions)]
+            # Merge batches
+            merged_predictions = []
+
+            task_targets["avg_latent"] = predictions_list
+
+            # Save results in checkpoint folder
+            pred_path = (
+                    Path(ckpt_path)
+                    / 'evals'
+                    / f"{save_tag}_{targets.name}"
+                    / f"{eval_set}_task{task}.csv"
+            )
+            pred_path.parent.mkdir(exist_ok=True, parents=True)
+            # pred_path = f'./{eval_set}_task{task}.csv'
+            print(f"Saving predictions to {pred_path}")
+            task_targets.to_csv(pred_path, index=False)
+
+
 def get_results_event_detection(pred_path):
     pred = pd.read_csv(pred_path)
     pred["trace_type_bin"] = pred["trace_type"] == "earthquake"

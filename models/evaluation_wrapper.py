@@ -117,9 +117,10 @@ class SeisBenchModuleLit(pl.LightningModule, ABC):
 
 
 class PhasePickerLit(SeisBenchModuleLit):
-    def __init__(self, ckpt_path=None, pretrained_name=None, pretrained_dataset=None):
+    def __init__(self, ckpt_path=None, pretrained_name=None, pretrained_dataset=None, avg_latent=False):
         super().__init__()
         self.save_hyperparameters()
+        self.avg_latent = avg_latent
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         if pretrained_name is not None and pretrained_dataset is not None:
@@ -157,6 +158,9 @@ class PhasePickerLit(SeisBenchModuleLit):
         else:
             x = self.encoder(x)
             x, _ = self.model(x, None)
+            if self.avg_latent:
+                # we want to evaluate the representation learned by the model and skip the decoder
+                return x
             x = self.decoder(x, None)
         return x
 
@@ -183,19 +187,23 @@ class PhasePickerLit(SeisBenchModuleLit):
         window_borders = batch['window_borders']
 
         pred = self.forward(x)
-        pred = F.softmax(pred, dim=-1)
+        if self.avg_latent:
+            m = torch.mean(pred, dim=1)
+            return m
+        else:
+            pred = F.softmax(pred, dim=-1)
 
-        score_detection = torch.zeros(pred.shape[0])
-        score_p_or_s = torch.zeros(pred.shape[0])
-        p_sample = torch.zeros(pred.shape[0], dtype=int)
-        s_sample = torch.zeros(pred.shape[0], dtype=int)
+            score_detection = torch.zeros(pred.shape[0])
+            score_p_or_s = torch.zeros(pred.shape[0])
+            p_sample = torch.zeros(pred.shape[0], dtype=int)
+            s_sample = torch.zeros(pred.shape[0], dtype=int)
 
-        for i in range(pred.shape[0]):
-            start_sample, end_sample = window_borders[i]
-            local_pred = pred[i, start_sample:end_sample, :]
+            for i in range(pred.shape[0]):
+                start_sample, end_sample = window_borders[i]
+                local_pred = pred[i, start_sample:end_sample, :]
 
-            score_detection[i] = torch.max(1 - local_pred[:, -1])
-            score_p_or_s[i] = torch.max(local_pred[:, 0]) / torch.max(local_pred[:, 1])
-            p_sample[i] = torch.argmax(local_pred[:, 0])
-            s_sample[i] = torch.argmax(local_pred[:, 1])
-        return score_detection, score_p_or_s, p_sample, s_sample
+                score_detection[i] = torch.max(1 - local_pred[:, -1])
+                score_p_or_s[i] = torch.max(local_pred[:, 0]) / torch.max(local_pred[:, 1])
+                p_sample[i] = torch.argmax(local_pred[:, 0])
+                s_sample[i] = torch.argmax(local_pred[:, 1])
+            return score_detection, score_p_or_s, p_sample, s_sample
