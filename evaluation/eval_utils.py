@@ -70,6 +70,10 @@ def load_checkpoint(
         print(f'Experiment name: {name}')
 
     if simple:
+        # hacky fix to load checkpoint, where the old parameter name complex (instead of is_complex) is used
+        if hparams['model']['_name_'] == 'mamba-sashimi':
+            if 'complex' in hparams['model'].keys():
+                hparams['model']['is_complex'] = hparams['model'].pop('complex')
         model = SimpleSeqModel(OmegaConf.create(hparams), d_data=d_data)
         model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
     else:
