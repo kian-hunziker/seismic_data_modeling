@@ -3,6 +3,10 @@ import evaluation.pick_eval as pe
 from models.evaluation_wrapper import PhasePickerLit
 
 if __name__ == '__main__':
+    """
+    Evaluate the latent space produced by encoder and model. We omit the decoder and average over the sequence 
+    length. 
+    """
     parser = argparse.ArgumentParser(
         description="Generate evaluation targets. See the docstring for details."
     )
