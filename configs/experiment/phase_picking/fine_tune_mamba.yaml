@@ -9,18 +9,21 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: mamba_sashimi
 
-experiment_name: fine_tune_mamba
+experiment_name: fine_tune_mamba_l2
 
 
 model:
   pretrained: wandb_logs/MA/2024-09-24__17_31_26
 
 model_update:
-  dropout: 0.3
+  dropout: 0.2
 
 train:
   monitor: val/loss
   mode: min
+  # l2 norm with regard to pretrained weights
+  l2: True
+  l2_lambda: 0.2
 
 dataset:
   sample_len: 4096
@@ -34,7 +37,7 @@ decoder:
   _name_: phase-pick
   convolutional: True
   kernel_size: 129
-  dropout: 0.1
+  #dropout: 0.1
 
 loader:
   batch_size: 128
@@ -43,14 +46,17 @@ loader:
 optimizer:
   lr: 0.002
   weight_decay: 0
+
 # the ETHZ train dataset has 22626 traces
 # with batch size 128 and drop last true that is 176 batches per epoch
 
 scheduler:
-  num_warmup_steps: 880
-  num_training_steps: 8800
+  num_warmup_steps: 704
+  num_training_steps: 7040
 
 trainer:
-  max_steps: 8800
-  max_epochs: 50
+  max_steps: 7040
+  max_epochs: 40
   gradient_clip_val: 1.0
+  #limit_train_batches: 0.01
+  #limit_val_batches: 0.01
