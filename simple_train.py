@@ -3,6 +3,7 @@ import os
 import threading
 import time
 import traceback
+import pickle
 
 import hydra
 import omegaconf
@@ -38,6 +39,7 @@ class SimpleSeqModel(pl.LightningModule):
         self.d_data = d_data
 
         if config.model.get('pretrained', None) is not None:
+            # load pretrained model
             print('\nLoading pretrained model\n')
 
             # extract checkpoint path
@@ -58,12 +60,24 @@ class SimpleSeqModel(pl.LightningModule):
                 self.model.eval()
                 for param in self.model.parameters():
                     param.requires_grad = False
+
+            # save parameters for L2 norm
+            self.l2_norm = config.train.get('l2', False)
+            if self.l2_norm:
+                # TODO: check if there is a better way to clone the model
+                self.l2_lambda = config.train.get('l2_lambda', 0.1)
+                ref_ckpt, _ = load_checkpoint(config.model.pretrained, d_data=d_data)
+                self.reference_model = ref_ckpt.model.eval()
+                for param in self.reference_model.parameters():
+                    param.requires_grad = False
         else:
+            # initialize new model
             self.model = instantiate(registry.model, self.hparams.model)
 
         try:
-            d_model = self.hparams.model.d_model
+            d_model = self.model.d_model
         except:
+            print('could not infer d_model from model')
             d_model = 0
 
         if config.encoder.get('pretrained', None) is not None:
@@ -109,15 +123,27 @@ class SimpleSeqModel(pl.LightningModule):
 
         return x, y
 
+    def _l2_norm(self):
+        # compute l2 norm between current model weights and reference (pretrained) model weights
+        l2_norm = 0
+        for param, ref_param in zip(self.model.parameters(), self.reference_model.parameters()):
+            l2_norm += (param - ref_param).norm(2)
+        return l2_norm
+
     def _step_with_metrics(self, batch, batch_idx, prefix='train'):
         x, y = self.forward(batch, batch_idx)
+        metrics = self.metrics(x, y)
 
         if prefix == 'train':
             loss = self.criterion(x, y)
+            if self.l2_norm:
+                l2_loss = self._l2_norm()
+                metrics['data_loss'] = loss
+                metrics['l2_norm'] = l2_loss
+                loss += self.l2_lambda * l2_loss
         else:
             loss = self.loss_val(x, y)
 
-        metrics = self.metrics(x, y)
         metrics['loss'] = loss
         metrics = {f'{prefix}/{metric}': val for metric, val in metrics.items()}
 
