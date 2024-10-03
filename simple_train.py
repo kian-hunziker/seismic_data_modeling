@@ -135,12 +135,14 @@ class SimpleSeqModel(pl.LightningModule):
         metrics = self.metrics(x, y)
 
         if prefix == 'train':
-            loss = self.criterion(x, y)
+            data_loss = self.criterion(x, y)
             if self.l2_norm:
                 l2_loss = self._l2_norm()
-                metrics['data_loss'] = loss
+                metrics['data_loss'] = data_loss
                 metrics['l2_norm'] = l2_loss
-                loss += self.l2_lambda * l2_loss
+                loss = data_loss + self.l2_lambda * l2_loss
+            else:
+                loss = data_loss
         else:
             loss = self.loss_val(x, y)
 
