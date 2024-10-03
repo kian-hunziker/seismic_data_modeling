@@ -306,12 +306,11 @@ def load_checkpoint(
         name = hparams['experiment_name']
         print(f'Experiment name: {name}')
 
+    # hacky fix to load checkpoint, where the old parameter name complex (instead of is_complex) is used
+    if hparams['model']['_name_'] == 'mamba-sashimi':
+        if 'complex' in hparams['model'].keys():
+            hparams['model']['is_complex'] = hparams['model'].pop('complex')
     if updated_model_config is not None:
-        # hacky fix to load checkpoint, where the old parameter name complex (instead of is_complex) is used
-        if hparams['model']['_name_'] == 'mamba-sashimi':
-            if 'complex' in hparams['model'].keys():
-                hparams['model']['is_complex'] = hparams['model'].pop('complex')
-
         # create and update omega config
         full_config = OmegaConf.create(hparams)
         full_config.model.update(updated_model_config)
@@ -319,7 +318,9 @@ def load_checkpoint(
         model = SimpleSeqModel(full_config, d_data=d_data)
         model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
     else:
-        model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
+        model = SimpleSeqModel(OmegaConf.create(hparams), d_data=d_data)
+        model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
+        #model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
     if return_path:
         return model, hparams, checkpoint_path
     else:
