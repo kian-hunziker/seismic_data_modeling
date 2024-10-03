@@ -188,7 +188,13 @@ class PhasePickerLit(SeisBenchModuleLit):
 
         pred = self.forward(x)
         if self.avg_latent:
-            m = torch.mean(pred, dim=1)
+            m = torch.zeros(pred.shape[0], pred.shape[-1])
+            for i in range(pred.shape[0]):
+                start_sample, end_sample = window_borders[i]
+                local_pred = pred[i, start_sample:end_sample, :]
+                m[i] = torch.mean(local_pred, dim=0)
+
+            # m = torch.mean(pred, dim=1)
             return m
         else:
             pred = F.softmax(pred, dim=-1)
