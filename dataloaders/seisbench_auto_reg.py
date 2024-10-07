@@ -75,12 +75,19 @@ def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 
 
 
 class SeisBenchAutoReg(SeisbenchDataLit):
-    def __init__(self, sample_len: int = 2048, bits: int = 8, d_data: int = 1, preload: bool = False, **kwargs):
+    def __init__(self,
+                 sample_len: int = 2048,
+                 bits: int = 8,
+                 d_data: int = 1,
+                 preload: bool = False,
+                 normalize_first: bool = False,
+                 **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
         self.d_data = d_data
         self.bits = bits
         self.preload = preload
+        self.normalize_first = normalize_first
         if self.preload:
             self.data = sbd.ETHZ(sampling_rate=100, cache='full')
             self.data.preload_waveforms(pbar=True)
@@ -92,16 +99,20 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         train, dev, test = self.data.train_dev_test()
 
         augmentations = [
-            sbg.WindowAroundSample(list(phase_dict.keys()), samples_before=self.sample_len, windowlen=2 * self.sample_len,
+            sbg.ChangeDtype(np.float32) if self.normalize_first else None,
+            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak") if self.normalize_first else None,
+            sbg.WindowAroundSample(list(phase_dict.keys()),
+                                   samples_before=self.sample_len,
+                                   windowlen=2 * self.sample_len,
                                    selection="random",
                                    strategy="variable"),
             sbg.RandomWindow(windowlen=self.sample_len + 1, strategy="pad"),
             FillMissingComponents(),
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
-            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
-            sbg.ChangeDtype(np.float32),
-            QuantizeAugmentation(bits=self.bits),
+            sbg.ChangeDtype(np.float32) if not self.normalize_first else None,
+            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak") if not self.normalize_first else None,
+            QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
             AutoregressiveShift()
         ]
@@ -198,12 +209,13 @@ class SeisBenchPhasePick(SeisbenchDataLit):
 
 def phase_pick_test():
     data_config = {
-        'sample_len': 4096,
+        'sample_len': 8192,
         'bits': 0,
         'd_data': 3,
+        'normalize_first': True,
     }
     loader_config = {
-        'batch_size': 128,
+        'batch_size': 32,
         'num_workers': 0,
         'shuffle': True,
     }
@@ -213,9 +225,12 @@ def phase_pick_test():
     batch = next(iter(train_loader))
     print(len(train_loader.dataset))
 
+    total_avg = 0
     for i, batch in enumerate(train_loader):
         autoreg_mse = torch.nn.functional.mse_loss(batch['X'], batch['y'])
-        print(f'autoreg_mse: {autoreg_mse :.2f}')
+        total_avg += autoreg_mse
+        print(f'autoreg_mse: {autoreg_mse :.4f}, log_mse: {torch.log(autoreg_mse):.4f}')
+    print('total_avg: ', total_avg / len(train_loader))
 
 
 if __name__ == "__main__":

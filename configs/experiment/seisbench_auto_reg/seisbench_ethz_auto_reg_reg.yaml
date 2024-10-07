@@ -9,7 +9,7 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: mamba_sashimi
 
-experiment_name: mamba_seisbench_auto_reg_regression
+experiment_name: mamba_seisbench_auto_reg_norm_first
 
 model:
   d_model: 64
@@ -38,6 +38,7 @@ dataset:
   sample_len: 4096
   bits: 0
   d_data: 3
+  normalize_first: True
 
 encoder:
   _name_: linear
