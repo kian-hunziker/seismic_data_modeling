@@ -63,7 +63,8 @@ class SimpleSeqModel(pl.LightningModule):
                     param.requires_grad = False
 
             if config.train.get('only_final_layer', False):
-                self.model.fix_all_but_last_layer()
+                num_layers_to_train = config.train.get('num_layers', 1)
+                self.model.fix_all_but_last_layer(num_layers=num_layers_to_train)
 
             # save parameters for L2 norm
             if self.l2_norm:
