@@ -398,6 +398,15 @@ class MambaSashimi(nn.Module):
 
         assert H == d_model
 
+    def fix_all_but_last_layer(self):
+        for param in self.d_layers.parameters():
+            param.requires_grad = False
+        for param in self.c_layers.parameters():
+            param.requires_grad = False
+        for param in self.u_layers[:-1].parameters():
+            param.requires_grad = False
+
+
     def forward(self, x, state=None, inference_params=None):
         """
         input: (batch, length, d_input)

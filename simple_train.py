@@ -38,6 +38,7 @@ class SimpleSeqModel(pl.LightningModule):
         self.save_hyperparameters(config)
         self.d_data = d_data
 
+        self.l2_norm = config.train.get('l2', False)
         if config.model.get('pretrained', None) is not None:
             # load pretrained model
             print('\nLoading pretrained model\n')
@@ -61,8 +62,10 @@ class SimpleSeqModel(pl.LightningModule):
                 for param in self.model.parameters():
                     param.requires_grad = False
 
+            if config.train.get('only_final_layer', False):
+                self.model.fix_all_but_last_layer()
+
             # save parameters for L2 norm
-            self.l2_norm = config.train.get('l2', False)
             if self.l2_norm:
                 # TODO: check if there is a better way to clone the model
                 self.l2_lambda = config.train.get('l2_lambda', 0.1)
@@ -127,6 +130,7 @@ class SimpleSeqModel(pl.LightningModule):
         # compute l2 norm between current model weights and reference (pretrained) model weights
         l2_norm = 0
         for param, ref_param in zip(self.model.parameters(), self.reference_model.parameters()):
+            # |param - ref_param|^2 / 2
             l2_norm += (param - ref_param).norm(2)
         return l2_norm
 
