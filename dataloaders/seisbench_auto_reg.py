@@ -81,6 +81,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                  d_data: int = 1,
                  preload: bool = False,
                  normalize_first: bool = False,
+                 dataset_name: str = 'ETHZ',
                  **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
@@ -88,11 +89,27 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.bits = bits
         self.preload = preload
         self.normalize_first = normalize_first
+
+        dataset_kwargs = {
+            'sampling_rate': 100,
+            'component_order': 'ZNE',
+            'dimension_order': 'NCW'
+        }
         if self.preload:
-            self.data = sbd.ETHZ(sampling_rate=100, cache='full')
-            self.data.preload_waveforms(pbar=True)
+            dataset_kwargs['cache'] = 'full'
+
+        if dataset_name == 'ETHZ':
+            self.data = sbd.ETHZ(**dataset_kwargs)
+        elif dataset_name == 'GEOFON':
+            self.data = sbd.GEOFON(**dataset_kwargs)
+        elif dataset_name == 'STEAD':
+            self.data = sbd.STEAD(**dataset_kwargs)
         else:
-            self.data = sbd.ETHZ(sampling_rate=100)
+            print(f'Unknown dataset: {dataset_name}')
+
+        if self.preload:
+            self.data.preload_waveforms(pbar=True)
+
         self.setup()
 
     def setup(self):
@@ -140,6 +157,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             preload: bool = False,
             sample_boundaries=(None, None),
             sigma=20,
+            dataset_name: str = 'ETHZ',
             **kwargs
     ):
         super().__init__(**kwargs)
@@ -149,11 +167,27 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         self.preload = preload
         self.sample_boundaries = sample_boundaries
         self.sigma = sigma
+
+        dataset_kwargs = {
+            'sampling_rate': 100,
+            'component_order': 'ZNE',
+            'dimension_order': 'NCW'
+        }
         if self.preload:
-            self.data = sbd.ETHZ(sampling_rate=100, cache='full')
-            self.data.preload_waveforms(pbar=True)
+            dataset_kwargs['cache'] = 'full'
+
+        if dataset_name == 'ETHZ':
+            self.data = sbd.ETHZ(**dataset_kwargs)
+        elif dataset_name == 'GEOFON':
+            self.data = sbd.GEOFON(**dataset_kwargs)
+        elif dataset_name == 'STEAD':
+            self.data = sbd.STEAD(**dataset_kwargs)
         else:
-            self.data = sbd.ETHZ(sampling_rate=100)
+            print(f'Unknown dataset: {dataset_name}')
+
+        if self.preload:
+            self.data.preload_waveforms(pbar=True)
+
         self.setup()
 
     def setup(self):
@@ -213,6 +247,7 @@ def phase_pick_test():
         'bits': 0,
         'd_data': 3,
         'normalize_first': True,
+        'dataset_name': 'GEOFON'
     }
     loader_config = {
         'batch_size': 32,
