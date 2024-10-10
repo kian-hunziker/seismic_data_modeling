@@ -26,6 +26,7 @@ def load_checkpoint(
         return_path: bool = False,
         simple: bool = False,
         d_data: int = 3,
+        return_random_init: bool = False,
 ) -> tuple[LightningSequenceModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
@@ -36,6 +37,8 @@ def load_checkpoint(
     :param checkpoint_path: path to checkpoint file. The hparams file is extracted automatically
     :param simple: Load SimpleSeqModel
     :param d_data: Data dimension for loading SimpleSeqModel, default is 3
+    :param return_random_init: If true, the state dict will not be loaded and a randomly initialized model
+    is returned
     :return: LightningSequenceModel, hparams
     """
     if not checkpoint_path.endswith('.ckpt'):
@@ -75,7 +78,8 @@ def load_checkpoint(
             if 'complex' in hparams['model'].keys():
                 hparams['model']['is_complex'] = hparams['model'].pop('complex')
         model = SimpleSeqModel(OmegaConf.create(hparams), d_data=d_data)
-        model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
+        if not return_random_init:
+            model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
     else:
         model = LightningSequenceModel.load_from_checkpoint(checkpoint_path, map_location=location)
     if return_path:
