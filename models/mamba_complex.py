@@ -378,14 +378,49 @@ class MambaComplex(nn.Module):
 
 
 class MambaBidirectional(nn.Module):
-    def __init__(self, d_model: int, **mamba_args):
+    def __init__(self, d_model: int, mode: str = 'attention', **mamba_args):
+        """
+        Bidirectional Mamba module. The input is passed through the forward Mamba block and the
+        reversed input is passed through the backward Mamba block. Mode controls how the two outputs
+        are combined.
+        :param d_model: d_model for both Mamba blocks
+        :param mode: one of ['attention', 'linear', 'weight', 'scalar', 'sum', 'avg']. Default is 'attention'.
+        :param mamba_args: Arguments passed to the Mamba blocks
+        """
         super(MambaBidirectional, self).__init__()
+        self.mode = mode
         self.mamba_forward = MambaComplex(d_model=d_model, **mamba_args)
         self.mamba_backward = MambaComplex(d_model=d_model, **mamba_args)
-        self.linear = nn.Linear(2 * d_model, d_model)
+
+        if self.mode == 'attention':
+            self.weight_projection = nn.Linear(2 * d_model, 1)
+        elif self.mode == 'linear':
+            self.linear = nn.Linear(2 * d_model, d_model)
+        elif self.mode == 'weight':
+            self.weight = nn.Parameter(torch.randn(1, 1, d_model))
+        elif self.mode == 'scalar':
+            self.weight = nn.Parameter(torch.tensor(0.5))
+        elif self.mode == 'sum' or self.mode == 'avg':
+            pass
+        else:
+            print(f'Unknown mode: {self.mode}')
 
     def forward(self, hidden_states, inference_params=None):
         rev = hidden_states.flip(dims=(1,))
-        x_forward = self.mamba_forward(hidden_states, inference_params)
-        x_backward = self.mamba_backward(rev, inference_params)
-        return self.linear(torch.cat((x_forward, x_backward), dim=-1))
+        x_forward = self.mamba_forward(hidden_states)
+        x_backward = self.mamba_backward(rev)
+
+        if self.mode == 'attention':
+            weights = torch.sigmoid(self.weight_projection(torch.cat((x_forward, x_backward), dim=-1)))
+            combined_output = weights * x_forward + (1 - weights) * x_backward
+        elif self.mode == 'linear':
+            combined_output = self.linear(torch.cat((x_forward, x_backward), dim=-1))
+        elif self.mode == 'weight' or self.mode == 'scalar':
+            w = torch.sigmoid(self.weight)
+            combined_output = w * x_forward + (1 - w) * x_backward
+        elif self.mode == 'sum':
+            combined_output = x_forward + x_backward
+        elif self.mode == 'avg':
+            combined_output = x_forward + x_backward / 2.0
+
+        return combined_output
