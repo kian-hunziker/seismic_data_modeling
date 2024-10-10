@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 from mamba_ssm.models.config_mamba import MambaConfig
 from mamba_ssm.modules.mamba_simple import Mamba
-from models.mamba_complex import MambaComplex
+from models.mamba_complex import MambaComplex, MambaBidirectional
 from mamba_ssm.modules.mamba2 import Mamba2
 from mamba_ssm.modules.mha import MHA
 from mamba_ssm.modules.mlp import GatedMLP
@@ -319,16 +319,27 @@ class MambaSashimi(nn.Module):
             dt_rank = math.ceil(dim / 16)
             if self.is_complex and dt_rank % 2 != 0:
                 dt_rank += 1
-            mixer_cls = partial(
-                MambaComplex,
-                d_state=64,
-                d_conv=self.d_conv,
-                expand=2,
-                layer_idx=layer_idx,
-                is_complex=self.is_complex,
-                dropout=dropout,
-                dt_rank=dt_rank
-            )
+
+            mamba_args = {
+                'd_conv': self.d_conv,
+                'expand': 2,
+                'layer_idx': layer_idx,
+                'is_complex': self.is_complex,
+                'dropout': dropout,
+                'dt_rank': dt_rank
+            }
+            if bidirectional:
+                mamba_args['d_state'] = 32
+                mixer_cls = partial(
+                    MambaBidirectional,
+                    **mamba_args
+                )
+            else:
+                mamba_args['d_state'] = 64
+                mixer_cls = partial(
+                    MambaComplex,
+                    **mamba_args
+                )
             norm_cls = partial(RMSNorm, eps=1e-5)
             if ff == 0:
                 mlp_cls = nn.Identity

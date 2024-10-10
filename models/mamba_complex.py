@@ -375,3 +375,17 @@ class MambaComplex(nn.Module):
                 conv_state.zero_()
                 ssm_state.zero_()
         return conv_state, ssm_state
+
+
+class MambaBidirectional(nn.Module):
+    def __init__(self, d_model: int, **mamba_args):
+        super(MambaBidirectional, self).__init__()
+        self.mamba_forward = MambaComplex(d_model=d_model, **mamba_args)
+        self.mamba_backward = MambaComplex(d_model=d_model, **mamba_args)
+        self.linear = nn.Linear(2 * d_model, d_model)
+
+    def forward(self, hidden_states, inference_params=None):
+        rev = hidden_states.flip(dims=(1,))
+        x_forward = self.mamba_forward(hidden_states, inference_params)
+        x_backward = self.mamba_backward(rev, inference_params)
+        return self.linear(torch.cat((x_forward, x_backward), dim=-1))
