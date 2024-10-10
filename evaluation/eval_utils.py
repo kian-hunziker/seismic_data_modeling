@@ -95,8 +95,8 @@ def get_pipeline_components(pl_module: LightningSequenceModel):
     decoder = pl_module.decoder.eval()
     model = pl_module.model.eval()
 
-    #if isinstance(model, Sashimi):
-        #model.setup_rnn()
+    # if isinstance(model, Sashimi):
+    # model.setup_rnn()
 
     return encoder, decoder, model
 
@@ -123,3 +123,12 @@ def get_sorted_file_list(dir_path: str):
 
     file_paths = [f for y, d, f in year_day_list]
     return file_paths
+
+
+def checkpoint_testing():
+    ckpt_path = '../wandb_logs/MA/2024-09-24__15_55_22'
+    model, _ = load_checkpoint(ckpt_path)
+
+
+if __name__ == '__main__':
+    checkpoint_testing()
