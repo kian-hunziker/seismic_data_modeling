@@ -5,6 +5,7 @@
 dataloaders/data/*
 pretrained_benchmark/*
 generated_audio/*
+evaluation/eval_tasks/*
 
 ## jupyter notebooks
 notebooks/*
