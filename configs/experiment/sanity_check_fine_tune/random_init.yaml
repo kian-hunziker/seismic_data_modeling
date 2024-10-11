@@ -1,0 +1,60 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: seisbench_phase
+  - /task: phase_pick
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: mamba_sashimi
+
+experiment_name: sanity_check_random_init
+
+
+model:
+  #pretrained: wandb_logs/MA/2024-09-27__18_23_04 # huge, 20M params ETHZ
+  pretrained: wandb_logs/MA/2024-09-24__17_31_26 # 6M params ETHZ
+  rand_init: True
+  freeze: True
+
+train:
+  monitor: val/loss
+  mode: min
+
+dataset:
+  sample_len: 4096
+  bits: 0
+  d_data: 3
+
+encoder:
+  pretrained: True
+  freeze: True
+
+decoder:
+  _name_: phase-pick
+  convolutional: True
+  kernel_size: 33
+  #dropout: 0.1
+
+loader:
+  batch_size: 128
+  drop_last: True
+
+optimizer:
+  lr: 0.001
+  weight_decay: 0
+
+# the ETHZ train dataset has 22626 traces
+# with batch size 128 and drop last true that is 176 batches per epoch
+
+scheduler:
+  num_warmup_steps: 352
+  num_training_steps: 3520
+
+trainer:
+  max_steps: 3520
+  max_epochs: 20
+  gradient_clip_val: 1.0
+  #limit_train_batches: 0.01
+  #limit_val_batches: 0.01
