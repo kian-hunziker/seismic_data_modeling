@@ -50,7 +50,17 @@ class SimpleSeqModel(pl.LightningModule):
             # for example: updated dropout value for fine-tuning
             if config.get('model_update', None) is not None:
                 update_configs = config.model_update
-                ckpt, _ = load_checkpoint(ckpt_path, updated_model_config=update_configs, d_data=d_data)
+
+                # check if the model should be randomly initialized (for sanity checks)
+                rand_init = config.model.get('rand_init', False)
+
+                # load model from checkpoint
+                ckpt, _ = load_checkpoint(
+                    ckpt_path,
+                    updated_model_config=update_configs,
+                    d_data=d_data,
+                    rand_init=rand_init
+                )
             else:
                 ckpt, _ = load_checkpoint(config.model.pretrained)
 
@@ -272,14 +282,24 @@ def load_checkpoint(
         checkpoint_path: str,
         location: str = 'cpu',
         return_path: bool = False,
-        updated_model_config: OmegaConf= None,
+        updated_model_config: OmegaConf = None,
         d_data: int = 3,
+        rand_init: bool = False,
 ) -> tuple[SimpleSeqModel, dict]:
     """
     Load checkpoint and hparams.yaml from specified path. Model is loaded to cpu.
     If no checkpoint is specified, the folder is searched for checkpoints and the one with the highest
     step number is returned.
+
     :param checkpoint_path: path to checkpoint file. The hparams file is extracted automatically
+    :param location: device to load to. Defaults to cpu as Lightning handles the devices
+    :param return_path: If true, returns the path to the specific checkpoint
+    :param updated_model_config: Config with updated parameters. We initially load the configurations from
+    the checkpoint and, if provided, use the updated_model_config to overwrite certain parameters. Mostly
+    used for fine-tuning e.g. a way to add dropout
+    :param d_data: data dimensionality. Passed to the constructor of the model.
+    :param rand_init: If True, the model architecture is determined by the provided checkpoint but the trained
+    weights are NOT loaded. Instead, the model is returned as is with default initialization.
     :return: LightningSequenceModel, hparams
     """
     if not checkpoint_path.endswith('.ckpt'):
@@ -308,7 +328,7 @@ def load_checkpoint(
         with open(hparam_path, 'r') as f:
             hparams = yaml.safe_load(f)
 
-    print(f'Loading checkpoint from {checkpoint_path}')
+    print(f'Loading hparams from {checkpoint_path}')
     if hparams is not None:
         name = hparams['experiment_name']
         print(f'Experiment name: {name}')
@@ -317,17 +337,26 @@ def load_checkpoint(
     if hparams['model']['_name_'] == 'mamba-sashimi':
         if 'complex' in hparams['model'].keys():
             hparams['model']['is_complex'] = hparams['model'].pop('complex')
+
+    # initialize model based on loaded resp. updated configuration
     if updated_model_config is not None:
         # create and update omega config
         full_config = OmegaConf.create(hparams)
         full_config.model.update(updated_model_config)
-        #print(full_config)
         model = SimpleSeqModel(full_config, d_data=d_data)
-        model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
+        #model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
     else:
         model = SimpleSeqModel(OmegaConf.create(hparams), d_data=d_data)
+
+    # load state dict or return randomly initialized model
+    if not rand_init:
+        print(f'Loading state dict from checkpoint')
         model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
         #model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
+    else:
+        print(f'Returning randomly initialized model')
+
+    # optionally return full path
     if return_path:
         return model, hparams, checkpoint_path
     else:
