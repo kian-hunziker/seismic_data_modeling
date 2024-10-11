@@ -282,6 +282,7 @@ class MambaSashimi(nn.Module):
             is_complex=False,
             simple_up_down=False,
             d_conv=4,
+            d_state=64,
             **s4_args,
     ):
         """
@@ -329,13 +330,13 @@ class MambaSashimi(nn.Module):
                 'dt_rank': dt_rank
             }
             if bidirectional:
-                mamba_args['d_state'] = 32
+                mamba_args['d_state'] = int(d_state // 2)
                 mixer_cls = partial(
                     MambaBidirectional,
                     **mamba_args
                 )
             else:
-                mamba_args['d_state'] = 64
+                mamba_args['d_state'] = d_state
                 mixer_cls = partial(
                     MambaComplex,
                     **mamba_args
