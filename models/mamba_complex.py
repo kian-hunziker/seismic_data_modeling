@@ -116,8 +116,10 @@ class MambaComplex(nn.Module):
                 "n -> d n",
                 d=self.d_inner
             ).contiguous()
+            # TODO: double check initialization. In the mamba paper they say the imaginary part is i * n
+            # but in the paper they reference (on the parametrization and initialization of DSS) it is i * pi * n
             A_imag = repeat(
-                torch.arange(0, self.d_state, dtype=torch.float32, device=device),
+                torch.arange(0, self.d_state, dtype=torch.float32, device=device) * torch.pi,
                 "n -> d n",
                 d=self.d_inner
             ).contiguous()
