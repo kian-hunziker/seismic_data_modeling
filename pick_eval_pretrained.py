@@ -38,9 +38,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_workers', type=int, default=0, help="Number of workers for dataloader"
     )
+    parser.add_argument(
+        '--sets', type=str, default='train,dev,test', help="Name of the target splits"
+    )
     args = parser.parse_args()
 
-    sets = 'train,dev,test'
     target_path = 'evaluation/eval_tasks/' + args.target_dataset
 
     model_name = args.model_name
@@ -64,7 +66,7 @@ if __name__ == '__main__':
             model=model,
             target_path=target_path,
             ckpt_path=f'pretrained_benchmark/{m}',
-            sets=sets,
+            sets=args.sets,
             save_tag='eval',
             batch_size=64,
             num_workers=args.num_workers
