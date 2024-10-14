@@ -106,6 +106,8 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             self.data = sbd.GEOFON(**dataset_kwargs)
         elif dataset_name == 'STEAD':
             self.data = sbd.STEAD(**dataset_kwargs)
+        elif dataset_name == 'INSTANCE':
+            self.data = sbd.InstanceCountsCombined(**dataset_kwargs)
         else:
             print(f'Unknown dataset: {dataset_name}')
 
@@ -194,6 +196,8 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             self.data = sbd.GEOFON(**dataset_kwargs)
         elif dataset_name == 'STEAD':
             self.data = sbd.STEAD(**dataset_kwargs)
+        elif dataset_name == 'INSTANCE':
+            self.data = sbd.InstanceCountsCombined(**dataset_kwargs)
         else:
             print(f'Unknown dataset: {dataset_name}')
 
