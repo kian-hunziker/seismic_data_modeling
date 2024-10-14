@@ -49,9 +49,9 @@ def remove_unused_augmentations(augmentations):
     return [a for a in augmentations if a is not None]
 
 
-def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 0):
+def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 0, norm_type: str = 'peak'):
     augmentations = [
-        sbg.SteeredWindow(windowlen=sample_len, strategy="pad"),
+        sbg.SteeredWindow(windowlen=sample_len, strategy=norm_type),
         sbg.ChangeDtype(np.float32),
         sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
         TransposeSeqChannels() if d_data == 3 else None,
@@ -82,6 +82,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                  preload: bool = False,
                  normalize_first: bool = False,
                  dataset_name: str = 'ETHZ',
+                 norm_type: str = 'peak',
                  **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
@@ -89,6 +90,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.bits = bits
         self.preload = preload
         self.normalize_first = normalize_first
+        self.norm_type = norm_type
 
         dataset_kwargs = {
             'sampling_rate': 100,
@@ -117,7 +119,11 @@ class SeisBenchAutoReg(SeisbenchDataLit):
 
         augmentations = [
             sbg.ChangeDtype(np.float32) if self.normalize_first else None,
-            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak") if self.normalize_first else None,
+            sbg.Normalize(
+                demean_axis=-1,
+                amp_norm_axis=-1,
+                amp_norm_type=self.norm_type,
+            ) if self.normalize_first else None,
             sbg.WindowAroundSample(list(phase_dict.keys()),
                                    samples_before=self.sample_len,
                                    windowlen=2 * self.sample_len,
@@ -128,7 +134,11 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
             sbg.ChangeDtype(np.float32) if not self.normalize_first else None,
-            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak") if not self.normalize_first else None,
+            sbg.Normalize(
+                demean_axis=-1,
+                amp_norm_axis=-1,
+                amp_norm_type=self.norm_type,
+            ) if self.normalize_first else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
             AutoregressiveShift()
@@ -158,6 +168,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             sample_boundaries=(None, None),
             sigma=20,
             dataset_name: str = 'ETHZ',
+            norm_type: str = 'peak',
             **kwargs
     ):
         super().__init__(**kwargs)
@@ -167,6 +178,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         self.preload = preload
         self.sample_boundaries = sample_boundaries
         self.sigma = sigma
+        self.norm_type = norm_type
 
         dataset_kwargs = {
             'sampling_rate': 100,
@@ -219,7 +231,11 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             FillMissingComponents(),
             FilterZChannel() if self.d_data == 1 else None,
             sbg.ChangeDtype(np.float32),
-            sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
+            sbg.Normalize(
+                demean_axis=-1,
+                amp_norm_axis=-1,
+                amp_norm_type=self.norm_type,
+            ),
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             sbg.ProbabilisticLabeller(
                 label_columns=phase_dict, sigma=self.sigma, dim=0
