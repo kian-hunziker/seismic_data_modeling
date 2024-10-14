@@ -30,6 +30,10 @@ from utils.config_utils import instantiate
 from utils import registry
 from omegaconf import DictConfig, OmegaConf
 from seisbench.util import worker_seeding
+import seisbench
+import logging
+# ignore INFO level logging
+seisbench.logger.setLevel(logging.WARNING)
 
 
 class SimpleSeqModel(pl.LightningModule):
