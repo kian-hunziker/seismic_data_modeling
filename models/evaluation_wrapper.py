@@ -24,7 +24,7 @@ from dataloaders.seisbench_auto_reg import phase_dict
 
 
 class PhasePickerLit(SeisBenchModuleLit):
-    def __init__(self, ckpt_path=None, avg_latent=False, random_init=False, ):
+    def __init__(self, ckpt_path=None, avg_latent=False, random_init=False, norm_type='peak'):
         """
         Wrapper class to evaluate a phase picker. The encoder, model and decoder are loaded from the provided
         checkpoint. If random_init is True, the hparams of the checkpoint are used to set up a model, which is
@@ -38,6 +38,7 @@ class PhasePickerLit(SeisBenchModuleLit):
         super().__init__()
         self.save_hyperparameters()
         self.avg_latent = avg_latent
+        self.norm_type = norm_type
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         # load checkpoint
@@ -83,7 +84,7 @@ class PhasePickerLit(SeisBenchModuleLit):
         return get_eval_augmentations(sample_len=self.sample_len, d_data=3, bits=0)
 
     def get_eval_augmentations(self):
-        return get_eval_augmentations(sample_len=self.sample_len, d_data=3, bits=0)
+        return get_eval_augmentations(sample_len=self.sample_len, d_data=3, bits=0, norm_type=self.norm_type)
 
     def predict_step(self, batch, batch_idx=None, dataloader_idx=None):
         x = batch['X']
