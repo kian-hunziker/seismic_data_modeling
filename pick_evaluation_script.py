@@ -26,7 +26,7 @@ if __name__ == '__main__':
     sets = 'train,dev,test'
     ckpt_path = args.checkpoint
 
-    model = PhasePickerLit(ckpt_path)
+    model = PhasePickerLit(ckpt_path, norm_type=args.norm_type)
 
     if '.ckpt' in ckpt_path:
         ckpt_path = '/'.join(ckpt_path.split('/')[:-2])
