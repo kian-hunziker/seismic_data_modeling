@@ -18,6 +18,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sets', type=str, default='train,dev,test', help="Name of the target splits"
     )
+    parser.add_argument(
+        '--norm_type', type=str, default='peak', help="Type of amplitude norm for data loader"
+    )
     args = parser.parse_args()
 
     sets = 'train,dev,test'
