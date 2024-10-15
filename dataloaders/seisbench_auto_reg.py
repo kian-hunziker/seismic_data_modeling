@@ -51,9 +51,9 @@ def remove_unused_augmentations(augmentations):
 
 def get_eval_augmentations(sample_len: int = 4096, d_data: int = 3, bits: int = 0, norm_type: str = 'peak'):
     augmentations = [
-        sbg.SteeredWindow(windowlen=sample_len, strategy=norm_type),
+        sbg.SteeredWindow(windowlen=sample_len, strategy='pad'),
         sbg.ChangeDtype(np.float32),
-        sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type="peak"),
+        sbg.Normalize(demean_axis=-1, amp_norm_axis=-1, amp_norm_type=norm_type),
         TransposeSeqChannels() if d_data == 3 else None,
     ]
     augmentations = remove_unused_augmentations(augmentations)
