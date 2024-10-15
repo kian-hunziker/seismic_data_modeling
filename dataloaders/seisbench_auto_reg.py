@@ -45,6 +45,35 @@ phase_dict = {
 }
 
 
+def apply_training_fraction(
+        training_fraction,
+        train_data,
+) -> None:
+    """
+  Reduces the size of train_data to train_fraction by inplace filtering.
+  Filter blockwise for efficient memory savings.
+
+  Args:
+    training_fraction: Training fraction between 0 and 1.
+    train_data: Training dataset
+
+  Returns:
+    None
+  """
+
+    if not 0.0 < training_fraction <= 1.0:
+        raise ValueError("Training fraction needs to be between 0 and 1.")
+
+    if training_fraction < 1:
+        blocks = train_data["trace_name"].apply(lambda x: x.split("$")[0])
+        unique_blocks = blocks.unique()
+        np.random.shuffle(unique_blocks)
+        target_blocks = unique_blocks[: int(training_fraction * len(unique_blocks))]
+        target_blocks = set(target_blocks)
+        mask = blocks.isin(target_blocks)
+        train_data.filter(mask, inplace=True)
+
+
 def remove_unused_augmentations(augmentations):
     return [a for a in augmentations if a is not None]
 
@@ -171,6 +200,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             sigma=20,
             dataset_name: str = 'ETHZ',
             norm_type: str = 'peak',
+            training_fraction: float = 1.0,
             **kwargs
     ):
         super().__init__(**kwargs)
@@ -181,6 +211,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         self.sample_boundaries = sample_boundaries
         self.sigma = sigma
         self.norm_type = norm_type
+        self.training_fraction = training_fraction
 
         dataset_kwargs = {
             'sampling_rate': 100,
@@ -191,23 +222,27 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             dataset_kwargs['cache'] = 'full'
 
         if dataset_name == 'ETHZ':
-            self.data = sbd.ETHZ(**dataset_kwargs)
+            data = sbd.ETHZ(**dataset_kwargs)
         elif dataset_name == 'GEOFON':
-            self.data = sbd.GEOFON(**dataset_kwargs)
+            data = sbd.GEOFON(**dataset_kwargs)
         elif dataset_name == 'STEAD':
-            self.data = sbd.STEAD(**dataset_kwargs)
+            data = sbd.STEAD(**dataset_kwargs)
         elif dataset_name == 'INSTANCE':
-            self.data = sbd.InstanceCountsCombined(**dataset_kwargs)
+            data = sbd.InstanceCountsCombined(**dataset_kwargs)
         else:
             print(f'Unknown dataset: {dataset_name}')
+        self.train, self.dev, self.test = data.train_dev_test()
+
+        if self.training_fraction < 1.0:
+            apply_training_fraction(training_fraction=training_fraction, train_data=self.train)
 
         if self.preload:
-            self.data.preload_waveforms(pbar=True)
+            self.train.preload_waveforms(pbar=True)
+            self.dev.preload_waveforms(pbar=True)
 
         self.setup()
 
     def setup(self):
-        train, dev, test = self.data.train_dev_test()
 
         augmentations = [
             # In 2/3 of the cases, select windows around picks, to reduce amount of noise traces in training.
@@ -249,9 +284,9 @@ class SeisBenchPhasePick(SeisbenchDataLit):
         ]
         augmentations = remove_unused_augmentations(augmentations)
 
-        self.dataset_train = sbg.GenericGenerator(train)
-        self.dataset_val = sbg.GenericGenerator(dev)
-        self.dataset_test = sbg.GenericGenerator(test)
+        self.dataset_train = sbg.GenericGenerator(self.train)
+        self.dataset_val = sbg.GenericGenerator(self.dev)
+        self.dataset_test = sbg.GenericGenerator(self.test)
 
         self.dataset_train.add_augmentations(augmentations)
         self.dataset_val.add_augmentations(augmentations)
@@ -263,18 +298,19 @@ class SeisBenchPhasePick(SeisbenchDataLit):
 
 def phase_pick_test():
     data_config = {
-        'sample_len': 8192,
+        'sample_len': 4096,
         'bits': 0,
         'd_data': 3,
         'normalize_first': True,
-        'dataset_name': 'GEOFON'
+        'dataset_name': 'ETHZ',
+        'training_fraction': 0.1,
     }
     loader_config = {
         'batch_size': 32,
         'num_workers': 0,
         'shuffle': True,
     }
-    dataset = SeisBenchAutoReg(**data_config)
+    dataset = SeisBenchPhasePick(**data_config)
     train_loader = DataLoader(dataset.dataset_train, **loader_config)
 
     batch = next(iter(train_loader))
