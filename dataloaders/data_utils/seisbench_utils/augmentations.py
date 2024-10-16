@@ -217,7 +217,7 @@ class RandomMask:
 
     def __call__(self, state_dict):
         x, metadata = state_dict[self.key[0]]
-        mask = np.random.choice([0, 1], size=x.shape, p=[self.p, 1.0 - self.p])
+        mask = np.random.choice([0, 1], size=x.shape, p=[self.p, 1.0 - self.p]).astype(np.float32)
         masked = x * mask
         state_dict[self.key[0]] = (masked, metadata)
         state_dict[self.key[1]] = (x, metadata)
