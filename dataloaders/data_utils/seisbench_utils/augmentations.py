@@ -207,6 +207,22 @@ class AutoregressiveShift:
         state_dict[self.key[1]] = (x[1:], metadata)
 
 
+class RandomMask:
+    def __init__(self, key=('X', 'y'), p=0.5):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+        self.p = p
+
+    def __call__(self, state_dict):
+        x, metadata = state_dict[self.key[0]]
+        mask = np.random.choice([0, 1], size=x.shape, p=[self.p, 1.0 - self.p])
+        masked = x * mask
+        state_dict[self.key[0]] = (masked, metadata)
+        state_dict[self.key[1]] = (x, metadata)
+
+
 class TransposeLabels:
     def __init__(self, key=('X', 'y'), ):
         if isinstance(key, str):

@@ -11,7 +11,7 @@ from scipy.signal import decimate
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
-    FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels
+    FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -112,6 +112,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                  normalize_first: bool = False,
                  dataset_name: str = 'ETHZ',
                  norm_type: str = 'peak',
+                 masking: float = 0.0,
                  **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
@@ -120,6 +121,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.preload = preload
         self.normalize_first = normalize_first
         self.norm_type = norm_type
+        self.masking = masking
 
         dataset_kwargs = {
             'sampling_rate': 100,
@@ -148,6 +150,8 @@ class SeisBenchAutoReg(SeisbenchDataLit):
     def setup(self):
         train, dev, test = self.data.train_dev_test()
 
+        window_len = self.sample_len + 1 if self.masking == 0 else self.sample_len
+
         augmentations = [
             sbg.ChangeDtype(np.float32) if self.normalize_first else None,
             sbg.Normalize(
@@ -160,7 +164,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                                    windowlen=2 * self.sample_len,
                                    selection="random",
                                    strategy="variable"),
-            sbg.RandomWindow(windowlen=self.sample_len + 1, strategy="pad"),
+            sbg.RandomWindow(windowlen=window_len, strategy="pad"),
             FillMissingComponents(),
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
@@ -172,7 +176,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             ) if self.normalize_first else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
-            AutoregressiveShift()
+            AutoregressiveShift() if self.masking == 0 else RandomMask(p=self.masking),
         ]
 
         augmentations = remove_unused_augmentations(augmentations)
@@ -304,13 +308,15 @@ def phase_pick_test():
         'normalize_first': True,
         'dataset_name': 'ETHZ',
         'training_fraction': 0.1,
+        'masking': 0.5,
+        'norm_type': 'std'
     }
     loader_config = {
-        'batch_size': 32,
+        'batch_size': 128,
         'num_workers': 0,
         'shuffle': True,
     }
-    dataset = SeisBenchPhasePick(**data_config)
+    dataset = SeisBenchAutoReg(**data_config)
     train_loader = DataLoader(dataset.dataset_train, **loader_config)
 
     batch = next(iter(train_loader))

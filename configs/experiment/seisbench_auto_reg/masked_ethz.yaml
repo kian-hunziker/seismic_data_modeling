@@ -1,0 +1,67 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: seisbench_auto_reg
+  - /task: regression
+  - /optimizer: adamw_mamba
+  - /scheduler: cosine_warmup
+  - /model: mamba_sashimi
+
+experiment_name: mamba_ethz_masking
+
+model:
+  d_model: 64
+  n_layers: 5
+  expand: 2
+  ff: 0
+  pool:
+    - 4
+    - 4
+  dropout: 0.0
+  unet: True
+  d_conv: 4
+  complex: True
+  bidirectional: True
+  d_state: 128
+
+train:
+  monitor: val/loss
+  mode: min
+  #chpt_path: wandb_logs/MA/
+
+task:
+  metrics:
+    - log_mse
+    - mse
+
+dataset:
+  sample_len: 4096
+  bits: 0
+  d_data: 3
+  normalize_first: True
+  norm_type: std
+  masking: 0.5
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: linear
+
+loader:
+  batch_size: 128
+  drop_last: True
+
+# the ETHZ train dataset has 22626 traces
+# with batch size 128 and drop last true that is 176 batches per epoch
+
+scheduler:
+  num_warmup_steps: 5280
+  num_training_steps: 52800
+
+trainer:
+  max_steps: 52800
+  max_epochs: 300
+  gradient_clip_val: 1.0
