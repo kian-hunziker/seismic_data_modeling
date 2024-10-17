@@ -229,20 +229,26 @@ class RandomMask:
             mask = np.random.choice([0, 1], size=seq_len, p=[self.p, 1.0 - self.p]).astype(np.float32)
             mask = np.expand_dims(mask, axis=-1)
             masked = x * mask
+            mask = np.ones_like(x) * mask
         elif r == 2:
             # zero out a random block of the trace. Block length is 25% of trace length
             block_length = int(seq_len // 4)
             start_idx = np.random.randint(0, seq_len - block_length + 1)
             masked = x.copy()
+            mask = np.ones_like(x)
             masked[start_idx:start_idx + block_length, :] = 0
+            mask[start_idx:start_idx + block_length, :] = 0
         elif r == 3:
             # zero out three random blocks of 5% sequence length each
             block_length = int(seq_len * 0.05)
             masked = x.copy()
+            mask = np.ones_like(x)
             for i in range(10):
                 start_idx = np.random.randint(0, seq_len - block_length + 1)
                 masked[start_idx:start_idx + block_length, :] = 0
-        state_dict[self.key[0]] = (masked, metadata)
+                mask[start_idx:start_idx + block_length, :] = 0
+        #state_dict['mask'] = np.invert(mask.astype(bool))
+        state_dict[self.key[0]] = ((masked, np.invert(mask.astype(bool))), metadata)
         state_dict[self.key[1]] = (x, metadata)
 
 
@@ -270,3 +276,42 @@ class TransposeSeqChannels:
     def __call__(self, state_dict):
         x, meta_x = state_dict[self.key[0]]
         state_dict[self.key[0]] = (np.transpose(x, (1, 0)), meta_x)
+
+
+class SquashAugmentation:
+    def __init__(self, key=('X', 'y'), squash_func: str = 'sqrt'):
+        """
+        Squash the trace with a squashing function. The squashing function is either 'sqrt' or 'log'
+        :param key:
+        :param squash_func: one of ['sqrt', 'log']
+        """
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+        self.squash_func = squash_func
+
+    def __call__(self, state_dict):
+        """
+        Squash the trace with a squashing function. The state_dict['X'] contains the input sequence of
+        dimensions [channels, seq_len]. The state_dict['y'] contains the ground truth. For pre-training,
+        this is also a sequence of dimensions [channels, seq_len].
+        :param state_dict:
+        :return:
+        """
+        x, metadata = state_dict[self.key[0]]
+
+        # remove mean
+        x = x - np.mean(x, axis=-1, keepdims=True)
+
+        # squash
+        if self.squash_func == 'sqrt':
+            x = np.sqrt(np.abs(x)) * np.sign(x)
+        elif self.squash_func == 'log':
+            print('log')
+            x = np.log(np.abs(x) + 1) * np.sign(x)
+            if np.sum(np.isnan(x)) > 0:
+                print('WARNING: Nan')
+                #print(self.squash_func)
+
+        state_dict[self.key[0]] = (x, metadata)
