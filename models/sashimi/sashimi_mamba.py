@@ -283,6 +283,7 @@ class MambaSashimi(nn.Module):
             simple_up_down=False,
             d_conv=4,
             d_state=64,
+            skip_first_residual=False,
             **s4_args,
     ):
         """
@@ -314,6 +315,7 @@ class MambaSashimi(nn.Module):
         self.unet = unet
         self.is_complex = is_complex
         self.n_layers = n_layers
+        self.skip_first_residual = skip_first_residual
 
         def mamba_block(dim, layer_idx):
             # make sure, the dt_rank is divisible by 2 which is required to make complex step function work
@@ -418,7 +420,6 @@ class MambaSashimi(nn.Module):
         for param in self.u_layers[:-num_layers].parameters():
             param.requires_grad = False
 
-
     def forward(self, x, state=None, inference_params=None):
         """
         input: (batch, length, d_input)
@@ -428,7 +429,10 @@ class MambaSashimi(nn.Module):
 
         # Down blocks
         outputs = []
-        outputs.append(x)
+        if self.skip_first_residual:
+            outputs.append(torch.zeros_like(x))
+        else:
+            outputs.append(x)
         residual = None
         for layer in self.d_layers:
             if isinstance(layer, DownPool) or isinstance(layer, DownPoolSimple):
