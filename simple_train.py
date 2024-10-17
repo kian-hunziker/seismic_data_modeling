@@ -128,7 +128,7 @@ class SimpleSeqModel(pl.LightningModule):
         if isinstance(batch, dict):
             x = batch['X']
             y = batch['y']
-            if isinstance(x, tuple):
+            if isinstance(x, list):
                 masked = True
                 x, mask = x
         else:
