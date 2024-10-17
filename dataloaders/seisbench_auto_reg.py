@@ -11,7 +11,8 @@ from scipy.signal import decimate
 from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
-    FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask
+    FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask, \
+    SquashAugmentation
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -152,13 +153,23 @@ class SeisBenchAutoReg(SeisbenchDataLit):
 
         window_len = self.sample_len + 1 if self.masking == 0 else self.sample_len
 
+        '''
+        sbg.Normalize(
+            demean_axis=-1,
+            amp_norm_axis=-1,
+            amp_norm_type=self.norm_type,
+        ) if self.normalize_first else None,
+        '''
         augmentations = [
             sbg.ChangeDtype(np.float32) if self.normalize_first else None,
+            SquashAugmentation(
+                squash_func=self.norm_type
+            ) if self.normalize_first and self.norm_type in ['sqrt', 'log'] else None,
             sbg.Normalize(
                 demean_axis=-1,
                 amp_norm_axis=-1,
                 amp_norm_type=self.norm_type,
-            ) if self.normalize_first else None,
+            ) if self.normalize_first and self.norm_type in ['peak', 'std'] else None,
             sbg.WindowAroundSample(list(phase_dict.keys()),
                                    samples_before=self.sample_len,
                                    windowlen=2 * self.sample_len,
@@ -169,11 +180,14 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
             sbg.ChangeDtype(np.float32) if not self.normalize_first else None,
+            SquashAugmentation(
+                squash_func=self.norm_type
+            ) if (not self.normalize_first) and self.norm_type in ['sqrt', 'log'] else None,
             sbg.Normalize(
                 demean_axis=-1,
                 amp_norm_axis=-1,
                 amp_norm_type=self.norm_type,
-            ) if self.normalize_first else None,
+            ) if (not self.normalize_first) and self.norm_type in ['peak', 'std'] else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
             AutoregressiveShift() if self.masking == 0 else RandomMask(p=self.masking),
@@ -309,12 +323,12 @@ def phase_pick_test():
         'dataset_name': 'ETHZ',
         'training_fraction': 0.1,
         'masking': 0.5,
-        'norm_type': 'std'
+        'norm_type': 'peak'
     }
     loader_config = {
         'batch_size': 64,
         'num_workers': 0,
-        'shuffle': False,
+        'shuffle': True,
     }
     dataset = SeisBenchAutoReg(**data_config)
     train_loader = DataLoader(dataset.dataset_val, **loader_config)
@@ -322,9 +336,12 @@ def phase_pick_test():
     batch = next(iter(train_loader))
     print(len(train_loader.dataset))
 
-    x = batch['X']
+    x, mask = batch['X']
+    #mask = batch['mask']
     for i in range(16):
-        plt.plot(x[i])
+        plt.plot(x[i, :100])
+        plt.show()
+        plt.plot(mask[i, :100])
         plt.show()
 
     total_avg = 0

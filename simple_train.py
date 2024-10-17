@@ -124,9 +124,13 @@ class SimpleSeqModel(pl.LightningModule):
         self.metrics = self.task.metrics
 
     def forward(self, batch, batch_idx=None):
+        masked = False
         if isinstance(batch, dict):
             x = batch['X']
             y = batch['y']
+            if isinstance(x, tuple):
+                masked = True
+                x, mask = x
         else:
             x, y = batch
 
@@ -138,6 +142,9 @@ class SimpleSeqModel(pl.LightningModule):
 
         # decode
         x = self.decoder(x, None)
+
+        if masked:
+            return x[mask], y[mask]
 
         return x, y
 
