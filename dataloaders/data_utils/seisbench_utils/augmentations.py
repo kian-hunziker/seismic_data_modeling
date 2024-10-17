@@ -216,9 +216,32 @@ class RandomMask:
         self.p = p
 
     def __call__(self, state_dict):
+        r = np.random.randint(0, 4)
+
         x, metadata = state_dict[self.key[0]]
-        mask = np.random.choice([0, 1], size=x.shape, p=[self.p, 1.0 - self.p]).astype(np.float32)
-        masked = x * mask
+        seq_len = x.shape[0]
+        if r == 0:
+            # zero out random elements with probability p. Channels are treated independently
+            mask = np.random.choice([0, 1], size=x.shape, p=[self.p, 1.0 - self.p]).astype(np.float32)
+            masked = x * mask
+        elif r == 1:
+            # zero out random samples with probability p. Zero out all three channels of the sample
+            mask = np.random.choice([0, 1], size=seq_len, p=[self.p, 1.0 - self.p]).astype(np.float32)
+            mask = np.expand_dims(mask, axis=-1)
+            masked = x * mask
+        elif r == 2:
+            # zero out a random block of the trace. Block length is 25% of trace length
+            block_length = int(seq_len // 4)
+            start_idx = np.random.randint(0, seq_len - block_length + 1)
+            masked = x.copy()
+            masked[start_idx:start_idx + block_length, :] = 0
+        elif r == 3:
+            # zero out three random blocks of 5% sequence length each
+            block_length = int(seq_len * 0.05)
+            masked = x.copy()
+            for i in range(10):
+                start_idx = np.random.randint(0, seq_len - block_length + 1)
+                masked[start_idx:start_idx + block_length, :] = 0
         state_dict[self.key[0]] = (masked, metadata)
         state_dict[self.key[1]] = (x, metadata)
 

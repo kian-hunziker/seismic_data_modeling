@@ -312,15 +312,20 @@ def phase_pick_test():
         'norm_type': 'std'
     }
     loader_config = {
-        'batch_size': 128,
+        'batch_size': 64,
         'num_workers': 0,
-        'shuffle': True,
+        'shuffle': False,
     }
     dataset = SeisBenchAutoReg(**data_config)
-    train_loader = DataLoader(dataset.dataset_train, **loader_config)
+    train_loader = DataLoader(dataset.dataset_val, **loader_config)
 
     batch = next(iter(train_loader))
     print(len(train_loader.dataset))
+
+    x = batch['X']
+    for i in range(16):
+        plt.plot(x[i])
+        plt.show()
 
     total_avg = 0
     for i, batch in enumerate(train_loader):
