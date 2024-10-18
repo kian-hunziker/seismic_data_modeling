@@ -253,18 +253,21 @@ class RandomMask:
 
 
 class ChunkMask:
-    def __init__(self, key=('X', 'y'), ):
+    def __init__(self, key=('X', 'y'), p=0.5):
         if isinstance(key, str):
             self.key = (key, key)
         else:
             self.key = key
+        self.p = p
 
     def __call__(self, state_dict):
         # choose random masking task
-        r = np.random.randint(0, 3)
+        r = np.random.randint(0, 4)
 
         x, metadata = state_dict[self.key[0]]
         seq_len = x.shape[0]
+        masked = x.copy()
+        mask = np.ones_like(x)
         if r == 0:
             # Big Chunk
             # zero out a random block of the trace. Block length is approx 20% of trace length
@@ -272,29 +275,32 @@ class ChunkMask:
             block_length = int(np.min((seq_len / 4 * np.abs(np.random.randn()), seq_len // 2)))
             #print(block_length)
             start_idx = np.random.randint(seq_len // 5, seq_len - block_length - seq_len // 5 + 1)
-            masked = x.copy()
-            mask = np.ones_like(x)
             masked[start_idx:start_idx + block_length, :] = 0
             mask[start_idx:start_idx + block_length, :] = 0
+            '''
+            elif r == 1:
+                # Random Channel Chunk
+                # zero out three random blocks of 10% sequence length each
+                # choose a random channel to which the mask is applied
+                for i in range(3):
+                    block_length = int(seq_len * 0.1 * np.abs(np.random.randn()))
+                    random_channel = np.random.randint(0, 3)
+                    start_idx = np.random.randint(0, seq_len - block_length + 1)
+                    masked[start_idx:start_idx + block_length, random_channel] = 0
+                    mask[start_idx:start_idx + block_length, random_channel] = 0
+            '''
         elif r == 1:
-            # Random Channel Chunk
-            # zero out three random blocks of 10% sequence length each
-            # choose a random channel to which the mask is applied
-            masked = x.copy()
-            mask = np.ones_like(x)
-            for i in range(3):
-                block_length = int(seq_len * 0.1 * np.abs(np.random.randn()))
-                random_channel = np.random.randint(0, 3)
-                start_idx = np.random.randint(0, seq_len - block_length + 1)
-                masked[start_idx:start_idx + block_length, random_channel] = 0
-                mask[start_idx:start_idx + block_length, random_channel] = 0
-        elif r == 2:
             # Small Chunks
-            # zero out 5 random blocks of 5% sequence length each
-            block_length = int(seq_len * 0.05)
-            masked = x.copy()
-            mask = np.ones_like(x)
-            for i in range(5):
+            # zero out 5 random blocks of 4% sequence length each
+            block_length = int(seq_len * 0.04)
+            while np.sum(mask[:, 0]) / seq_len > 1 - self.p:
+                start_idx = np.random.randint(0, seq_len - block_length + 1)
+                masked[start_idx:start_idx + block_length, :] = 0
+                mask[start_idx:start_idx + block_length, :] = 0
+        elif r == 2 or r == 3:
+            block_length = 20
+            n_blocks = int(seq_len * self.p / block_length)
+            for i in range(n_blocks):
                 start_idx = np.random.randint(0, seq_len - block_length + 1)
                 masked[start_idx:start_idx + block_length, :] = 0
                 mask[start_idx:start_idx + block_length, :] = 0

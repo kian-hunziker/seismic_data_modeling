@@ -190,7 +190,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             ) if (not self.normalize_first) and self.norm_type in ['peak', 'std'] else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
-            AutoregressiveShift() if self.masking == 0 else ChunkMask(),
+            AutoregressiveShift() if self.masking == 0 else ChunkMask(p=self.masking),
         ]
 
         augmentations = remove_unused_augmentations(augmentations)
@@ -322,7 +322,7 @@ def phase_pick_test():
         'normalize_first': True,
         'dataset_name': 'ETHZ',
         'training_fraction': 0.1,
-        'masking': 0.5,
+        'masking': 0.3,
         'norm_type': 'std'
     }
     loader_config = {
@@ -338,11 +338,12 @@ def phase_pick_test():
 
     x, mask = batch['X']
     #mask = batch['mask']
+    s = 0
     l = -1
     for i in range(8):
-        plt.plot(x[i, :l])
+        plt.plot(x[i, s:l])
         plt.show()
-        plt.plot(mask[i, :l])
+        plt.plot(mask[i, s:l])
         plt.show()
 
     total_avg = 0
