@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
     FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask, \
-    SquashAugmentation
+    SquashAugmentation, ChunkMask
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -190,7 +190,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             ) if (not self.normalize_first) and self.norm_type in ['peak', 'std'] else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
-            AutoregressiveShift() if self.masking == 0 else RandomMask(p=self.masking),
+            AutoregressiveShift() if self.masking == 0 else ChunkMask(),
         ]
 
         augmentations = remove_unused_augmentations(augmentations)
@@ -323,7 +323,7 @@ def phase_pick_test():
         'dataset_name': 'ETHZ',
         'training_fraction': 0.1,
         'masking': 0.5,
-        'norm_type': 'peak'
+        'norm_type': 'std'
     }
     loader_config = {
         'batch_size': 64,
@@ -338,15 +338,18 @@ def phase_pick_test():
 
     x, mask = batch['X']
     #mask = batch['mask']
-    for i in range(16):
-        plt.plot(x[i, :100])
+    l = -1
+    for i in range(8):
+        plt.plot(x[i, :l])
         plt.show()
-        plt.plot(mask[i, :100])
+        plt.plot(mask[i, :l])
         plt.show()
 
     total_avg = 0
     for i, batch in enumerate(train_loader):
-        autoreg_mse = torch.nn.functional.mse_loss(batch['X'], batch['y'])
+        x, mask = batch['X']
+        y = batch['y']
+        autoreg_mse = torch.nn.functional.mse_loss(x[mask], y[mask])
         total_avg += autoreg_mse
         print(f'autoreg_mse: {autoreg_mse :.4f}, log_mse: {torch.log(autoreg_mse):.4f}')
     print('total_avg: ', total_avg / len(train_loader))
