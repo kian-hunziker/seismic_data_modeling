@@ -239,6 +239,7 @@ class SimpleSeqModel(pl.LightningModule):
 
         keys = set([k for hp in hps for k in hp.keys()])  # Special hparams
         print_optim(optimizer, keys)
+        print('\n\n')
 
         # Configure scheduler
         if "scheduler" not in self.hparams:
