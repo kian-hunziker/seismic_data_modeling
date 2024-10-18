@@ -25,6 +25,7 @@ from tasks.task import task_registry
 from dataloaders.base import SeisbenchDataLit
 
 from torch.utils.data import DataLoader
+import utils
 
 from utils.config_utils import instantiate
 from utils import registry
@@ -128,6 +129,7 @@ class SimpleSeqModel(pl.LightningModule):
         if isinstance(batch, dict):
             x = batch['X']
             y = batch['y']
+            # TODO: clean this. Masking might not be the only time x is a list
             if isinstance(x, list):
                 masked = True
                 x, mask = x
@@ -208,6 +210,10 @@ class SimpleSeqModel(pl.LightningModule):
 
     def configure_optimizers(self):
         # Normal parameters
+        if 'optimizer_param_grouping' in self.hparams.train:
+            utils.optim_utils.add_optimizer_hooks(self.model, **self.hparams.train.optimizer_param_grouping)
+
+        # Normal parameters
         all_params = list(self.parameters())
         params = [p for p in all_params if not hasattr(p, "_optim")]
 
@@ -216,6 +222,23 @@ class SimpleSeqModel(pl.LightningModule):
             del args['_name_']
         optimizer = instantiate(registry.optimizer, self.hparams.optimizer, params)
         print(f"Optimizer: {optimizer}")
+
+        # Add parameters with special hyperparameters
+        hps = [getattr(p, "_optim") for p in all_params if hasattr(p, "_optim")]
+        hps = [
+            # dict(s) for s in set(frozenset(hp.items()) for hp in hps)
+            dict(s) for s in sorted(list(dict.fromkeys(frozenset(hp.items()) for hp in hps)))
+            # dict(s) for s in dict.fromkeys(frozenset(hp.items()) for hp in hps)
+        ]  # Unique dicts
+        print("Hyperparameter groups", hps)
+        for hp in hps:
+            params = [p for p in all_params if getattr(p, "_optim", None) == hp]
+            optimizer.add_param_group(
+                {"params": params, **self.hparams.optimizer, **hp}
+            )
+
+        keys = set([k for hp in hps for k in hp.keys()])  # Special hparams
+        utils.optim_utils.print_optim(optimizer, keys)
 
         # Configure scheduler
         if "scheduler" not in self.hparams:
