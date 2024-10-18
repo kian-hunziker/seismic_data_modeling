@@ -34,6 +34,7 @@ class LinearDecoder(Decoder):
     def __init__(self, in_features, out_features, num_classes=None):
         super().__init__(in_features, out_features)
         self.linear = nn.Linear(in_features, out_features)
+        self.linear.weight._no_weight_decay = True
 
     def forward(self, x, state=None):
         return self.linear(x)
