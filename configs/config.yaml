@@ -15,4 +15,8 @@ train:
   monitor: val/loss
   mode: min
 
+  optimizer_param_grouping:
+    bias_weight_decay: False
+    normalization_weight_decay: False
+
 
