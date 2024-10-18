@@ -25,10 +25,10 @@ from tasks.task import task_registry
 from dataloaders.base import SeisbenchDataLit
 
 from torch.utils.data import DataLoader
-import utils
 
 from utils.config_utils import instantiate
 from utils import registry
+from utils.optim_utils import print_optim, add_optimizer_hooks
 from omegaconf import DictConfig, OmegaConf
 from seisbench.util import worker_seeding
 import seisbench
@@ -211,7 +211,7 @@ class SimpleSeqModel(pl.LightningModule):
     def configure_optimizers(self):
         # Normal parameters
         if 'optimizer_param_grouping' in self.hparams.train:
-            utils.optim_utils.add_optimizer_hooks(self.model, **self.hparams.train.optimizer_param_grouping)
+            add_optimizer_hooks(self.model, **self.hparams.train.optimizer_param_grouping)
 
         # Normal parameters
         all_params = list(self.parameters())
@@ -238,7 +238,7 @@ class SimpleSeqModel(pl.LightningModule):
             )
 
         keys = set([k for hp in hps for k in hp.keys()])  # Special hparams
-        utils.optim_utils.print_optim(optimizer, keys)
+        print_optim(optimizer, keys)
 
         # Configure scheduler
         if "scheduler" not in self.hparams:
