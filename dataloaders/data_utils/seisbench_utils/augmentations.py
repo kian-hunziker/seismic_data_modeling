@@ -338,32 +338,35 @@ class BertStyleMask:
         y = x.copy()
         seq_len = x.shape[0]
         mask = np.ones_like(x)
-        if r == 0:
-            # Big Chunk
-            # zero out a random block of the trace. Block length is self.p * seq_len
-            # The center of the block is normally distributed around the center of the sequence
-            block_length = int(seq_len * self.p + seq_len * 0.01 * np.random.randn())
-            center = seq_len / 2 + seq_len / 4 * np.random.randn()
-            center = np.max((block_length / 2 + 1, center))
-            center = int(np.min((center, seq_len - (block_length / 2) - 1)))
-            start_idx = int(center - block_length // 2)
-            self._fill_mask(x, start_idx, block_length, replacement_strat)
-            mask[start_idx:start_idx + block_length, :] = 0
-        elif r == 1:
-            # Small Chunks
-            # zero out 5 random blocks of 4% sequence length each
-            block_length = int(seq_len * 0.04 + seq_len * 0.01 * np.random.randn())
-            while np.sum(mask[:, 0]) / seq_len > 1 - self.p:
-                start_idx = np.random.randint(0, seq_len - block_length + 1)
+        try:
+            if r == 0:
+                # Big Chunk
+                # zero out a random block of the trace. Block length is self.p * seq_len
+                # The center of the block is normally distributed around the center of the sequence
+                block_length = int(np.abs(seq_len * self.p + seq_len * 0.01 * np.random.randn()))
+                center = seq_len / 2 + seq_len / 4 * np.random.randn()
+                center = np.max((block_length / 2 + 1, center))
+                center = int(np.min((center, seq_len - (block_length / 2) - 1)))
+                start_idx = int(center - block_length // 2)
                 self._fill_mask(x, start_idx, block_length, replacement_strat)
                 mask[start_idx:start_idx + block_length, :] = 0
-        elif r == 2 or r == 3:
-            block_length = 20
-            n_blocks = int(seq_len * self.p / block_length)
-            for i in range(n_blocks):
-                start_idx = np.random.randint(0, seq_len - block_length + 1)
-                self._fill_mask(x, start_idx, block_length, replacement_strat)
-                mask[start_idx:start_idx + block_length, :] = 0
+            elif r == 1:
+                # Small Chunks
+                # zero out 5 random blocks of 4% sequence length each
+                block_length = int(np.abs(seq_len * 0.04 + seq_len * 0.01 * np.random.randn()))
+                while np.sum(mask[:, 0]) / seq_len > 1 - self.p:
+                    start_idx = np.random.randint(0, seq_len - block_length + 1)
+                    self._fill_mask(x, start_idx, block_length, replacement_strat)
+                    mask[start_idx:start_idx + block_length, :] = 0
+            elif r == 2 or r == 3:
+                block_length = 20
+                n_blocks = int(seq_len * self.p / block_length)
+                for i in range(n_blocks):
+                    start_idx = np.random.randint(0, seq_len - block_length + 1)
+                    self._fill_mask(x, start_idx, block_length, replacement_strat)
+                    mask[start_idx:start_idx + block_length, :] = 0
+        except:
+            print('could not generate mask')
 
         state_dict[self.key[0]] = ((x, np.invert(mask.astype(bool))), metadata)
         state_dict[self.key[1]] = (y, metadata)
