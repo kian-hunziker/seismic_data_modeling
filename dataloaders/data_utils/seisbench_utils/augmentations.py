@@ -353,8 +353,8 @@ class BertStyleMask:
             elif r == 1:
                 # Small Chunks
                 # zero out 5 random blocks of 4% sequence length each
-                block_length = int(np.abs(seq_len * 0.04 + seq_len * 0.01 * np.random.randn()))
                 while np.sum(mask[:, 0]) / seq_len > 1 - self.p:
+                    block_length = int(np.abs(seq_len * 0.04 + seq_len * 0.01 * np.random.randn()))
                     start_idx = np.random.randint(0, seq_len - block_length + 1)
                     self._fill_mask(x, start_idx, block_length, replacement_strat)
                     mask[start_idx:start_idx + block_length, :] = 0
