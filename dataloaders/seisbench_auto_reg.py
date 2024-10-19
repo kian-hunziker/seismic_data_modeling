@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
     FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask, \
-    SquashAugmentation, ChunkMask
+    SquashAugmentation, ChunkMask, BertStyleMask
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -190,7 +190,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             ) if (not self.normalize_first) and self.norm_type in ['peak', 'std'] else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
-            AutoregressiveShift() if self.masking == 0 else ChunkMask(p=self.masking),
+            AutoregressiveShift() if self.masking == 0 else BertStyleMask(p=self.masking),
         ]
 
         augmentations = remove_unused_augmentations(augmentations)
@@ -322,7 +322,7 @@ def phase_pick_test():
         'normalize_first': True,
         'dataset_name': 'ETHZ',
         'training_fraction': 0.1,
-        'masking': 0.3,
+        'masking': 0.15,
         'norm_type': 'std'
     }
     loader_config = {

@@ -273,7 +273,7 @@ class ChunkMask:
             # zero out a random block of the trace. Block length is approx 20% of trace length
             # the block is located in the middle 3/5 of the trace
             block_length = int(np.min((seq_len / 4 * np.abs(np.random.randn()), seq_len // 2)))
-            #print(block_length)
+            # print(block_length)
             start_idx = np.random.randint(seq_len // 5, seq_len - block_length - seq_len // 5 + 1)
             masked[start_idx:start_idx + block_length, :] = 0
             mask[start_idx:start_idx + block_length, :] = 0
@@ -307,6 +307,66 @@ class ChunkMask:
 
         state_dict[self.key[0]] = ((masked, np.invert(mask.astype(bool))), metadata)
         state_dict[self.key[1]] = (x, metadata)
+
+
+class BertStyleMask:
+    def __init__(self, key=('X', 'y'), p=0.5):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+        self.p = p
+
+    def _fill_mask(self, x_in, start_idx, block_length, strategy):
+        if strategy < 0.8:
+            # zero out with 80% chance
+            x_in[start_idx:start_idx + block_length, :] = 0
+        elif strategy < 0.9:
+            # random noise with 10% chance
+            std = np.std(x_in[start_idx:start_idx + block_length], keepdims=True)
+            x_in[start_idx:start_idx + block_length, :] = std * np.random.randn(block_length, 3)
+        # do nothing with 10% chance
+
+    def __call__(self, state_dict):
+        # choose random masking task
+        r = np.random.randint(0, 4)
+
+        # choose random replacement strategy
+        replacement_strat = np.random.random()
+
+        x, metadata = state_dict[self.key[0]]
+        y = x.copy()
+        seq_len = x.shape[0]
+        mask = np.ones_like(x)
+        if r == 0:
+            # Big Chunk
+            # zero out a random block of the trace. Block length is self.p * seq_len
+            # The center of the block is normally distributed around the center of the sequence
+            block_length = int(seq_len * self.p + seq_len * 0.01 * np.random.randn())
+            center = seq_len / 2 + seq_len / 4 * np.random.randn()
+            center = np.max((block_length / 2 + 1, center))
+            center = int(np.min((center, seq_len - (block_length / 2) - 1)))
+            start_idx = int(center - block_length // 2)
+            self._fill_mask(x, start_idx, block_length, replacement_strat)
+            mask[start_idx:start_idx + block_length, :] = 0
+        elif r == 1:
+            # Small Chunks
+            # zero out 5 random blocks of 4% sequence length each
+            block_length = int(seq_len * 0.04 + seq_len * 0.01 * np.random.randn())
+            while np.sum(mask[:, 0]) / seq_len > 1 - self.p:
+                start_idx = np.random.randint(0, seq_len - block_length + 1)
+                self._fill_mask(x, start_idx, block_length, replacement_strat)
+                mask[start_idx:start_idx + block_length, :] = 0
+        elif r == 2 or r == 3:
+            block_length = 20
+            n_blocks = int(seq_len * self.p / block_length)
+            for i in range(n_blocks):
+                start_idx = np.random.randint(0, seq_len - block_length + 1)
+                self._fill_mask(x, start_idx, block_length, replacement_strat)
+                mask[start_idx:start_idx + block_length, :] = 0
+
+        state_dict[self.key[0]] = ((x, np.invert(mask.astype(bool))), metadata)
+        state_dict[self.key[1]] = (y, metadata)
 
 
 class TransposeLabels:
