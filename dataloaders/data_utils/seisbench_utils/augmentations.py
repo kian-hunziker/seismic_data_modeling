@@ -360,7 +360,7 @@ class BertStyleMask:
                     mask[start_idx:start_idx + block_length, :] = 0
             elif r == 2 or r == 3:
                 block_length = 20
-                n_blocks = int(seq_len * self.p / block_length)
+                n_blocks = int(seq_len * 2 * self.p / block_length)
                 for i in range(n_blocks):
                     start_idx = np.random.randint(0, seq_len - block_length + 1)
                     self._fill_mask(x, start_idx, block_length, replacement_strat)
