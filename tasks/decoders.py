@@ -334,7 +334,7 @@ class ConvNetDecoder(nn.Module):
             padding=padding,
         )
 
-    def forward(self, x):
+    def forward(self, x, state=None):
         x = x.transpose(1, 2)
         x = F.relu(self.conv1(x))
         x = self.conv2(x)
