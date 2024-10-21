@@ -327,6 +327,32 @@ class ConditionalLinearEncoder(nn.Module):
         return samples + embeddings
 
 
+class ConvNetEncoder(nn.Module):
+    def __init__(self, in_features, out_features, kernel_size=5, dim=128):
+        super().__init__()
+        padding = kernel_size // 2
+        self.conv1 = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=dim,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=padding
+        )
+        self.conv2 = nn.Conv1d(
+            in_channels=dim,
+            out_channels=out_features,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=padding,
+        )
+
+    def forward(self, x):
+        x = x.transpose(1, 2)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        return x.transpose(1, 2)
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
@@ -339,6 +365,7 @@ enc_registry = {
     'learned-classes': DownPoolClassEncoder,
     's4-class': S4ClassEncoder,
     'conditional-linear': ConditionalLinearEncoder,
+    'convnet-encoder': ConvNetEncoder,
 }
 
 pretrain_encoders = ['transformer, s4-encoder', 'pool', 'learned-classes', 's4-class']

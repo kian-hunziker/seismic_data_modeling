@@ -315,6 +315,32 @@ class CausalDecoder(nn.Module):
         return out.squeeze(1)
 
 
+class ConvNetDecoder(nn.Module):
+    def __init__(self, in_features, out_features, kernel_size=5, dim=128):
+        super().__init__()
+        padding = kernel_size // 2
+        self.conv1 = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=dim,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=padding
+        )
+        self.conv2 = nn.Conv1d(
+            in_channels=dim,
+            out_channels=out_features,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=padding,
+        )
+
+    def forward(self, x):
+        x = x.transpose(1, 2)
+        x = F.relu(self.conv1(x))
+        x = self.conv2(x)
+        return x.transpose(1, 2)
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -325,6 +351,7 @@ dec_registry = {
     'phase-pick': PhasePickDecoder,
     'sequence-classifier': SequenceClassifier,
     'causal-decoder': CausalDecoder,
+    'convnet-decoder': ConvNetDecoder
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
