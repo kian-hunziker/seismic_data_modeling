@@ -160,6 +160,13 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             amp_norm_type=self.norm_type,
         ) if self.normalize_first else None,
         '''
+        '''
+                    sbg.WindowAroundSample(list(phase_dict.keys()),
+                                           samples_before=self.sample_len,
+                                           windowlen=2 * self.sample_len,
+                                           selection="random",
+                                           strategy="variable"),
+                                        '''
         augmentations = [
             sbg.ChangeDtype(np.float32) if self.normalize_first else None,
             SquashAugmentation(
@@ -170,11 +177,6 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                 amp_norm_axis=-1,
                 amp_norm_type=self.norm_type,
             ) if self.normalize_first and self.norm_type in ['peak', 'std'] else None,
-            sbg.WindowAroundSample(list(phase_dict.keys()),
-                                   samples_before=self.sample_len,
-                                   windowlen=2 * self.sample_len,
-                                   selection="random",
-                                   strategy="variable"),
             sbg.RandomWindow(windowlen=window_len, strategy="pad"),
             FillMissingComponents(),
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
@@ -217,7 +219,7 @@ class SeisBenchPhasePick(SeisbenchDataLit):
             sample_boundaries=(None, None),
             sigma=20,
             dataset_name: str = 'ETHZ',
-            norm_type: str = 'peak',
+            norm_type: str = 'sqrt',
             training_fraction: float = 1.0,
             **kwargs
     ):
@@ -321,7 +323,7 @@ def phase_pick_test():
         'd_data': 3,
         'normalize_first': True,
         'dataset_name': 'ETHZ',
-        'training_fraction': 0.1,
+        'training_fraction': 1,
         'masking': 0.15,
         'norm_type': 'std'
     }
@@ -340,9 +342,9 @@ def phase_pick_test():
     #mask = batch['mask']
     s = 0
     l = -1
-    for i in range(8):
-        plt.plot(x[i, s:l])
-        plt.show()
+    for i in range(16):
+        #plt.plot(x[i, s:l])
+        #plt.show()
         plt.plot(mask[i, s:l])
         plt.show()
 
