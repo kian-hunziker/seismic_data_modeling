@@ -328,7 +328,7 @@ class ConditionalLinearEncoder(nn.Module):
 
 
 class ConvNetEncoder(nn.Module):
-    def __init__(self, in_features, out_features, kernel_size=5, dim=128):
+    def __init__(self, in_features, out_features, kernel_size=5, dim=128, bias=False):
         super().__init__()
         padding = kernel_size // 2
         self.conv1 = nn.Conv1d(
@@ -336,7 +336,8 @@ class ConvNetEncoder(nn.Module):
             out_channels=dim,
             kernel_size=kernel_size,
             stride=1,
-            padding=padding
+            padding=padding,
+            bias=bias,
         )
         self.conv2 = nn.Conv1d(
             in_channels=dim,
@@ -344,6 +345,7 @@ class ConvNetEncoder(nn.Module):
             kernel_size=kernel_size,
             stride=1,
             padding=padding,
+            bias=bias,
         )
 
     def forward(self, x):
