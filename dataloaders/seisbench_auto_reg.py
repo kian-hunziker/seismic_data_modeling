@@ -18,6 +18,7 @@ from evaluation.eval_sashimi import moving_average
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
 import seisbench
 import seisbench.data as sbd
+from seisbench.data import MultiWaveformDataset
 import seisbench.generate as sbg
 import seisbench.models as sbm
 from seisbench.util import worker_seeding
@@ -113,6 +114,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                  normalize_first: bool = False,
                  dataset_name: str = 'ETHZ',
                  norm_type: str = 'peak',
+                 alpha: float = 1.0,
                  masking: float = 0.0,
                  **kwargs):
         super().__init__(**kwargs)
@@ -122,26 +124,36 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.preload = preload
         self.normalize_first = normalize_first
         self.norm_type = norm_type
+        self.alpha = alpha
         self.masking = masking
 
-        dataset_kwargs = {
-            'sampling_rate': 100,
-            'component_order': 'ZNE',
-            'dimension_order': 'NCW'
-        }
-        if self.preload:
-            dataset_kwargs['cache'] = 'full'
+        if isinstance(dataset_name, str):
+            dataset_name = [dataset_name]
 
-        if dataset_name == 'ETHZ':
-            self.data = sbd.ETHZ(**dataset_kwargs)
-        elif dataset_name == 'GEOFON':
-            self.data = sbd.GEOFON(**dataset_kwargs)
-        elif dataset_name == 'STEAD':
-            self.data = sbd.STEAD(**dataset_kwargs)
-        elif dataset_name == 'INSTANCE':
-            self.data = sbd.InstanceCountsCombined(**dataset_kwargs)
+        multi_waveform_datasets = []
+        cache = 'full' if preload else None
+        for data_name in dataset_name:
+            dataset = sbd.__getattribute__(data_name)(
+                sampling_rate=100,
+                component_order='ZNE',
+                dimension_order='NCW',
+                cache=cache
+            )
+            if "split" not in dataset.metadata.columns:
+                print("No split defined, adding auxiliary split.")
+                split = np.array(["train"] * len(dataset))
+                split[int(0.6 * len(dataset)): int(0.7 * len(dataset))] = "dev"
+                split[int(0.7 * len(dataset)):] = "test"
+
+                dataset._metadata["split"] = split  # pylint: disable=protected-access
+
+            multi_waveform_datasets.append(dataset)
+
+        if len(multi_waveform_datasets) == 1:
+            self.data = multi_waveform_datasets[0]
         else:
-            print(f'Unknown dataset: {dataset_name}')
+            # Concatenate multiple datasets
+            self.data = MultiWaveformDataset(multi_waveform_datasets)
 
         if self.preload:
             self.data.preload_waveforms(pbar=True)
@@ -170,7 +182,8 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         augmentations = [
             sbg.ChangeDtype(np.float32) if self.normalize_first else None,
             SquashAugmentation(
-                squash_func=self.norm_type
+                squash_func=self.norm_type,
+                alpha=self.alpha,
             ) if self.normalize_first and self.norm_type in ['sqrt', 'log'] else None,
             sbg.Normalize(
                 demean_axis=-1,
@@ -183,7 +196,8 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             FilterZChannel() if self.d_data == 1 else None,
             sbg.ChangeDtype(np.float32) if not self.normalize_first else None,
             SquashAugmentation(
-                squash_func=self.norm_type
+                squash_func=self.norm_type,
+                alpha=self.alpha,
             ) if (not self.normalize_first) and self.norm_type in ['sqrt', 'log'] else None,
             sbg.Normalize(
                 demean_axis=-1,
@@ -322,10 +336,11 @@ def phase_pick_test():
         'bits': 0,
         'd_data': 3,
         'normalize_first': True,
-        'dataset_name': 'ETHZ',
+        'dataset_name': ['ETHZ', 'GEOFON'],
         'training_fraction': 1,
-        'masking': 0.15,
-        'norm_type': 'std'
+        'masking': 0.25,
+        'norm_type': 'log',
+        'alpha': 0.001,
     }
     loader_config = {
         'batch_size': 64,
@@ -333,29 +348,29 @@ def phase_pick_test():
         'shuffle': True,
     }
     dataset = SeisBenchAutoReg(**data_config)
-    train_loader = DataLoader(dataset.dataset_val, **loader_config)
+    loader = DataLoader(dataset.dataset_val, **loader_config)
 
-    batch = next(iter(train_loader))
-    print(len(train_loader.dataset))
+    batch = next(iter(loader))
+    print(len(loader.dataset))
 
     x, mask = batch['X']
     #mask = batch['mask']
     s = 0
     l = -1
     for i in range(16):
-        #plt.plot(x[i, s:l])
-        #plt.show()
-        plt.plot(mask[i, s:l])
+        plt.plot(x[i, s:l])
         plt.show()
+        #plt.plot(mask[i, s:l])
+        #plt.show()
 
     total_avg = 0
-    for i, batch in enumerate(train_loader):
+    for i, batch in enumerate(loader):
         x, mask = batch['X']
         y = batch['y']
         autoreg_mse = torch.nn.functional.mse_loss(x[mask], y[mask])
         total_avg += autoreg_mse
         print(f'autoreg_mse: {autoreg_mse :.4f}, log_mse: {torch.log(autoreg_mse):.4f}')
-    print('total_avg: ', total_avg / len(train_loader))
+    print('total_avg: ', total_avg / len(loader))
 
 
 if __name__ == "__main__":
