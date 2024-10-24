@@ -187,7 +187,11 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
             sbg.ChangeDtype(np.float32),
-            RMSNormAugmentation(),
+            sbg.Normalize(
+                demean_axis=-1,
+                amp_norm_axis=-1,
+                amp_norm_type=self.norm_type,
+            ),
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
             AutoregressiveShift() if self.masking == 0 else BrainMask(p1=self.masking, p2=0.5),
