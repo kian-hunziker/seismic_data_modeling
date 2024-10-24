@@ -186,7 +186,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             FillMissingComponents(),
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
-            sbg.ChangeDtype(np.float32) if not self.normalize_first else None,
+            sbg.ChangeDtype(np.float32),
             RMSNormAugmentation(),
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
