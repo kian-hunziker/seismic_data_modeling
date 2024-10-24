@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
     FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask, \
-    SquashAugmentation, ChunkMask, BertStyleMask
+    SquashAugmentation, ChunkMask, BertStyleMask, BrainMask, RMSNormAugmentation
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -150,19 +150,21 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             multi_waveform_datasets.append(dataset)
 
         if len(multi_waveform_datasets) == 1:
-            self.data = multi_waveform_datasets[0]
+            data = multi_waveform_datasets[0]
         else:
             # Concatenate multiple datasets
-            self.data = MultiWaveformDataset(multi_waveform_datasets)
+            data = MultiWaveformDataset(multi_waveform_datasets)
+
+        self.train, self.dev, self.test = data.train_dev_test()
+
 
         if self.preload:
-            self.data.preload_waveforms(pbar=True)
+            self.train.preload_waveforms(pbar=True)
+            self.dev.preload_waveforms(pbar=True)
 
         self.setup()
 
     def setup(self):
-        train, dev, test = self.data.train_dev_test()
-
         window_len = self.sample_len + 1 if self.masking == 0 else self.sample_len
 
         '''
@@ -181,39 +183,22 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                                         '''
         augmentations = [
             sbg.ChangeDtype(np.float32) if self.normalize_first else None,
-            SquashAugmentation(
-                squash_func=self.norm_type,
-                alpha=self.alpha,
-            ) if self.normalize_first and self.norm_type in ['sqrt', 'log'] else None,
-            sbg.Normalize(
-                demean_axis=-1,
-                amp_norm_axis=-1,
-                amp_norm_type=self.norm_type,
-            ) if self.normalize_first and self.norm_type in ['peak', 'std'] else None,
+            RMSNormAugmentation(),
             sbg.RandomWindow(windowlen=window_len, strategy="pad"),
             FillMissingComponents(),
             # sbg.ProbabilisticLabeller(label_columns=phase_dict, sigma=30, dim=0),
             FilterZChannel() if self.d_data == 1 else None,
             sbg.ChangeDtype(np.float32) if not self.normalize_first else None,
-            SquashAugmentation(
-                squash_func=self.norm_type,
-                alpha=self.alpha,
-            ) if (not self.normalize_first) and self.norm_type in ['sqrt', 'log'] else None,
-            sbg.Normalize(
-                demean_axis=-1,
-                amp_norm_axis=-1,
-                amp_norm_type=self.norm_type,
-            ) if (not self.normalize_first) and self.norm_type in ['peak', 'std'] else None,
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
-            AutoregressiveShift() if self.masking == 0 else BertStyleMask(p=self.masking),
+            AutoregressiveShift() if self.masking == 0 else BrainMask(p1=self.masking, p2=0.5),
         ]
 
         augmentations = remove_unused_augmentations(augmentations)
 
-        self.dataset_train = sbg.GenericGenerator(train)
-        self.dataset_val = sbg.GenericGenerator(dev)
-        self.dataset_test = sbg.GenericGenerator(test)
+        self.dataset_train = sbg.GenericGenerator(self.train)
+        self.dataset_val = sbg.GenericGenerator(self.dev)
+        self.dataset_test = sbg.GenericGenerator(self.test)
 
         self.dataset_train.add_augmentations(augmentations)
         self.dataset_val.add_augmentations(augmentations)
@@ -336,9 +321,9 @@ def phase_pick_test():
         'bits': 0,
         'd_data': 3,
         'normalize_first': True,
-        'dataset_name': ['ETHZ', 'GEOFON'],
-        'training_fraction': 1,
-        'masking': 0.25,
+        'dataset_name': ['ETHZ'],
+        'training_fraction': 0.1,
+        'masking': 0.75,
         'norm_type': 'log',
         'alpha': 0.001,
     }
