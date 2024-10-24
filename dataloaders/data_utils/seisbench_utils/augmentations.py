@@ -399,17 +399,19 @@ class TransposeSeqChannels:
 
 
 class SquashAugmentation:
-    def __init__(self, key=('X', 'y'), squash_func: str = 'sqrt'):
+    def __init__(self, key=('X', 'y'), squash_func: str = 'sqrt', alpha: float = 1.0):
         """
         Squash the trace with a squashing function. The squashing function is either 'sqrt' or 'log'
         :param key:
         :param squash_func: one of ['sqrt', 'log']
+        :param alpha: trace is multiplied by alpha before being squashed (squash_func(alpha * x) * sign(x))
         """
         if isinstance(key, str):
             self.key = (key, key)
         else:
             self.key = key
         self.squash_func = squash_func
+        self.alpha = alpha
 
     def __call__(self, state_dict):
         """
@@ -426,10 +428,10 @@ class SquashAugmentation:
 
         # squash
         if self.squash_func == 'sqrt':
-            x = np.sqrt(np.abs(x)) * np.sign(x)
+            x = np.sqrt(self.alpha * np.abs(x)) * np.sign(x)
         elif self.squash_func == 'log':
-            print('log')
-            x = np.log(np.abs(x) + 1) * np.sign(x)
+            # print('log')
+            x = np.log(1.0 + self.alpha * np.abs(x)) * np.sign(x)
             if np.sum(np.isnan(x)) > 0:
                 print('WARNING: Nan')
                 # print(self.squash_func)
