@@ -437,3 +437,65 @@ class SquashAugmentation:
                 # print(self.squash_func)
 
         state_dict[self.key[0]] = (x, metadata)
+
+class BrainMask:
+    def __init__(self, key=('X', 'y'), p1=0.5, p2=0.5):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+        self.p1 = p1
+        self.p2 = p2
+
+    def _fill_mask(self, x_in, start_idx, block_length, strategy):
+        if strategy < 0.8:
+            # zero out with 80% chance
+            x_in[start_idx:start_idx + block_length, :] = 0
+        elif strategy < 0.9:
+            # random noise with 10% chance
+            std = np.std(x_in[start_idx:start_idx + block_length], keepdims=True)
+            x_in[start_idx:start_idx + block_length, :] = std * np.random.randn(block_length, 3)
+        # do nothing with 10% chance
+
+    def __call__(self, state_dict):
+        # choose random masking task
+        r = np.random.randint(0, 2)
+
+        # choose random replacement strategy
+        replacement_strat = np.random.random()
+
+        x, metadata = state_dict[self.key[0]]
+        y = x.copy()
+        seq_len = x.shape[0]
+        mask = np.ones_like(x)
+        try:
+            if r == 0:
+                # mask self.p percent of sequence with blocks of 20 samples
+                block_length = 20
+                n_blocks = int(seq_len * self.p1 / block_length)
+                for i in range(n_blocks):
+                    start_idx = np.random.randint(0, seq_len - block_length + 1)
+                    self._fill_mask(x, start_idx, block_length, replacement_strat)
+                    mask[start_idx:start_idx + block_length, :] = 0
+            elif r == 1:
+                # future masking
+                block_length = int(seq_len * self.p2)
+                x[-block_length:, :] = 0
+                mask[-block_length:, :] = 0
+        except:
+            print('could not generate mask')
+
+        state_dict[self.key[0]] = ((x, np.invert(mask.astype(bool))), metadata)
+        state_dict[self.key[1]] = (y, metadata)
+class RMSNormAugmentation:
+    def __init__(self, key=('X', 'y'), ):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+
+    def __call__(self, state_dict):
+        x, meta_x = state_dict[self.key[0]]
+        rms = np.sqrt(np.mean(x ** 2))
+        x = x / rms
+        state_dict[self.key[0]] = (x, meta_x)
