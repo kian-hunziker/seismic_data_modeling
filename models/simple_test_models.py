@@ -8,6 +8,7 @@ import os
 class IdentityModel(nn.Module):
     def __init__(self, d_model=None):
         super(IdentityModel, self).__init__()
+        self.d_model = d_model
 
     def forward(self, x, state=None):
         return x, None
