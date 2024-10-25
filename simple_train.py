@@ -51,13 +51,14 @@ class SimpleSeqModel(pl.LightningModule):
             # extract checkpoint path
             ckpt_path = config.model.pretrained
 
+            # check if the model should be randomly initialized (for sanity checks)
+            rand_init = config.model.get('rand_init', False)
+            print(f'model random initialization: {rand_init}')
+
             # look for updated model parameters
             # for example: updated dropout value for fine-tuning
             if config.get('model_update', None) is not None:
                 update_configs = config.model_update
-
-                # check if the model should be randomly initialized (for sanity checks)
-                rand_init = config.model.get('rand_init', False)
 
                 # load model from checkpoint
                 ckpt, _ = load_checkpoint(
@@ -67,7 +68,11 @@ class SimpleSeqModel(pl.LightningModule):
                     rand_init=rand_init
                 )
             else:
-                ckpt, _ = load_checkpoint(config.model.pretrained)
+                ckpt, _ = load_checkpoint(
+                    checkpoint_path=ckpt_path,
+                    d_data=d_data,
+                    rand_init=rand_init,
+                )
 
             # extract main model from checkpoint
             self.model = ckpt.model
@@ -102,12 +107,12 @@ class SimpleSeqModel(pl.LightningModule):
         if config.encoder.get('pretrained', None) is not None:
             print('\nLoading pretrained encoder\n')
             self.encoder = ckpt.encoder
+            if config.encoder.get('freeze', None) is not None and config.encoder.get('freeze', False):
+                self.encoder.eval()
+                for param in self.encoder.parameters():
+                    param.requires_grad = False
         else:
             self.encoder = instantiate_encoder_simple(self.hparams.encoder, d_data=self.d_data, d_model=d_model)
-        if config.encoder.get('freeze', None) is not None and config.encoder.get('freeze', False):
-            self.encoder.eval()
-            for param in self.encoder.parameters():
-                param.requires_grad = False
 
         if config.decoder.get('pretrained', None) is not None:
             print('\nLoading pretrained decoder\n')
