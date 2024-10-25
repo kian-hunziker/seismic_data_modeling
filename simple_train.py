@@ -102,12 +102,12 @@ class SimpleSeqModel(pl.LightningModule):
         if config.encoder.get('pretrained', None) is not None:
             print('\nLoading pretrained encoder\n')
             self.encoder = ckpt.encoder
-            if config.encoder.get('freeze', None) is not None and config.encoder.get('freeze', False):
-                self.encoder.eval()
-                for param in self.encoder.parameters():
-                    param.requires_grad = False
         else:
             self.encoder = instantiate_encoder_simple(self.hparams.encoder, d_data=self.d_data, d_model=d_model)
+        if config.encoder.get('freeze', None) is not None and config.encoder.get('freeze', False):
+            self.encoder.eval()
+            for param in self.encoder.parameters():
+                param.requires_grad = False
 
         if config.decoder.get('pretrained', None) is not None:
             print('\nLoading pretrained decoder\n')
