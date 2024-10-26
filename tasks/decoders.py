@@ -382,6 +382,33 @@ class BidirAutoregDecoder(nn.Module):
         return (out_ntk, out_ptk, x_tokens)
 
 
+class BidirPhasePickDecoder(nn.Module):
+    def __init__(self, in_features, out_features, upsample=True, kernel_size=33):
+        super(BidirPhasePickDecoder, self).__init__()
+        self.upsample = upsample
+        if self.upsample:
+            self.upSample = Conv1dUpsampling(hidden_dim=in_features)
+
+        self.linear = nn.Linear(2 * in_features, 2 * in_features)
+        self.out_conv = nn.Conv1d(
+            in_channels=2 * in_features,
+            out_channels=out_features,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=int(kernel_size // 2),
+        )
+
+    def forward(self, x, state=None):
+        x_ntk, x_ptk, _ = x
+        if self.upsample:
+            x_ntk = self.upSample(x_ntk)
+            x_ptk = self.upSample(x_ptk)
+        out = torch.cat([x_ntk, x_ptk], dim=-1)
+        out = F.gelu(self.linear(out))
+        out = self.out_conv(out.transpose(1, 2)).transpose(1, 2)[:, 4:-4, :]
+        return out
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -394,6 +421,7 @@ dec_registry = {
     'causal-decoder': CausalDecoder,
     'convnet-decoder': ConvNetDecoder,
     'bidir-autoreg-decoder': BidirAutoregDecoder,
+    'bidir-phasepick-decoder': BidirPhasePickDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
