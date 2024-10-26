@@ -28,6 +28,7 @@ model = {
     "identity": "models.simple_test_models.IdentityModel",
     "phase-net": "models.phasenet_wrapper.PhaseNetWrapper",
     "hybrid-sashimi": "models.sashimi.sashimi_hybrid.HybridSashimi",
+    "bidir-autoreg-mamba": "models.bidirAutoregMamba.BidirAutoregMamba"
 }
 
 dataset = {
