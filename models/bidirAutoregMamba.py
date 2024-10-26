@@ -94,6 +94,10 @@ class BidirAutoregMamba(nn.Module):
         self.ln_f = nn.LayerNorm(self.d_model)
 
     def forward(self, hidden_states, state=None):
+        if isinstance(hidden_states, tuple):
+            hidden_states, x_tokens = hidden_states
+        else:
+            x_tokens = None
         batch_size, seq_len, dim = hidden_states.shape
 
         # Add the SOS and EOS token to the input sequence
@@ -119,11 +123,17 @@ class BidirAutoregMamba(nn.Module):
 
             if (
                     l + 1) == self.n_layers - 1:  # use the hidden states from the second last layer for next token prediction
+                print('hidden_states_ntp', hidden_states[0, :10, 0])
+                # if residual is not None:
+                print('residual', residual[0, :10, 0])
                 hidden_states_NTP = hidden_states + residual
             elif (l + 1) == self.n_layers:  # use the hidden states from the last layer for previous token prediction
+                print('hidden_states_ptk', hidden_states[0, :10, 0])
+                # if residual is not None:
+                print('residual', residual[0, :10, 0])
                 hidden_states_PTP = hidden_states + residual
 
         X_NTK = self.ln_f(hidden_states_NTP)
         X_PTK = self.ln_f(hidden_states_PTP)
 
-        return (X_NTK, X_PTK), None
+        return (X_NTK, X_PTK, x_tokens), None

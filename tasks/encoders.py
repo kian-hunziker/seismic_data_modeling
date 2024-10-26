@@ -355,6 +355,66 @@ class ConvNetEncoder(nn.Module):
         return x.transpose(1, 2)
 
 
+class Conv1dSubampling(nn.Module):
+    """
+    Convolutional 1d subsampling with padding to control sequence length reduction.
+    Args:
+        in_channels (int): Number of channels in the input (e.g., n_mels for spectrogram)
+        out_channels (int): Number of channels produced by the convolution (typically model dimension)
+        reduce_time_layers (int): Number of halving conv layers to apply (default is 2 for 1/4 reduction)
+
+    Inputs: inputs
+        - **inputs** (batch, time, dim): Tensor containing sequence of inputs
+
+    Returns:
+        - **outputs** (batch, time, dim): Tensor produced by the convolution
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, reduce_time_layers: int = 2) -> None:
+        super(Conv1dSubampling, self).__init__()
+
+        # First, reduce the time_length
+        time_reduce_layers = []
+        for _ in range(reduce_time_layers):
+            time_reduce_layers.extend([
+                nn.Conv1d(in_channels, in_channels, kernel_size=3, stride=2, padding=1),
+                nn.GELU()
+            ])
+        self.time_reduce = nn.Sequential(*time_reduce_layers)
+
+        # Then, mix the model_dim
+        self.dim_mix = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.GELU()
+        )
+
+    def forward(self, inputs):
+        inputs = inputs.permute(0, 2, 1)  # Change shape to (batch_size, dim, time)
+        tokens = self.time_reduce(inputs)
+        outputs = self.dim_mix(tokens)
+        outputs = outputs.permute(0, 2, 1)  # Revert shape to (batch_size, time, dim)
+        return outputs, tokens.permute(0, 2, 1)
+
+
+class BidirAutoregEncoder(nn.Module):
+    def __init__(self, in_features, out_features, dropout: float = 0.0):
+        super(BidirAutoregEncoder, self).__init__()
+        self.conv_subsampling = Conv1dSubampling(
+            in_channels=in_features,
+            out_channels=out_features,
+            reduce_time_layers=2
+        )
+        self.input_projection = nn.Sequential(
+            nn.Linear(out_features, out_features),
+            nn.Dropout(p=dropout)
+        )
+
+    def forward(self, x):
+        x, x_tokens = self.conv_subsampling(x)
+        x = self.input_projection(x)
+        return (x, x_tokens)
+
+
 enc_registry = {
     'dummy': DummyEncoder,
     'linear': LinearEncoder,
@@ -368,6 +428,7 @@ enc_registry = {
     's4-class': S4ClassEncoder,
     'conditional-linear': ConditionalLinearEncoder,
     'convnet-encoder': ConvNetEncoder,
+    'bidir-autoreg-encoder': BidirAutoregEncoder,
 }
 
 pretrain_encoders = ['transformer, s4-encoder', 'pool', 'learned-classes', 's4-class']
