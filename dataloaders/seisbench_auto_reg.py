@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
     FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask, \
-    SquashAugmentation, ChunkMask, BertStyleMask, BrainMask, RMSNormAugmentation
+    SquashAugmentation, ChunkMask, BertStyleMask, BrainMask, RMSNormAugmentation, CopyXY
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -116,6 +116,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
                  norm_type: str = 'peak',
                  alpha: float = 1.0,
                  masking: float = 0.0,
+                 bidir_autoreg: bool = False,
                  **kwargs):
         super().__init__(**kwargs)
         self.sample_len = sample_len
@@ -126,6 +127,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.norm_type = norm_type
         self.alpha = alpha
         self.masking = masking
+        self.bidir_autoreg = bidir_autoreg
 
         if isinstance(dataset_name, str):
             dataset_name = [dataset_name]
@@ -194,8 +196,13 @@ class SeisBenchAutoReg(SeisbenchDataLit):
             ),
             QuantizeAugmentation(bits=self.bits) if self.bits > 0 else None,
             TransposeSeqChannels() if self.d_data == 3 else None,
-            AutoregressiveShift() if self.masking == 0 else BrainMask(p1=self.masking, p2=0.5),
+            #CopyXY(),
+            #AutoregressiveShift() if self.masking == 0 else BrainMask(p1=self.masking, p2=0.5),
         ]
+        if self.bidir_autoreg:
+            augmentations.append(CopyXY())
+        else:
+            augmentations.append(AutoregressiveShift() if self.masking == 0 else BrainMask(p1=self.masking, p2=0.5))
 
         augmentations = remove_unused_augmentations(augmentations)
 
@@ -327,7 +334,7 @@ def phase_pick_test():
         'dataset_name': ['ETHZ'],
         'training_fraction': 0.1,
         'masking': 0.75,
-        'norm_type': 'log',
+        'norm_type': 'std',
         'alpha': 0.001,
     }
     loader_config = {
