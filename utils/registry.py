@@ -30,6 +30,7 @@ model = {
     "hybrid-sashimi": "models.sashimi.sashimi_hybrid.HybridSashimi",
     "pure-hydra": "models.pure_hydra.PureHydra",
     "hydra-unet": "models.hydra_models.hydra_unet.HydraUnet",
+    "bidir-autoreg-mamba": "models.bidirAutoregMamba.BidirAutoregMamba"
 }
 
 dataset = {

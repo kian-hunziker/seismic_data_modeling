@@ -340,6 +340,47 @@ class ConvNetDecoder(nn.Module):
         x = self.conv2(x)
         return x.transpose(1, 2)
 
+class Conv1dUpsampling(nn.Module):
+    def __init__(self, hidden_dim: int, reduce_time_layers: int = 2):
+        super(Conv1dUpsampling, self).__init__()
+
+        # Upsample only in the time dimension, increase time dimensions of the hidden_states tensor
+        layers = []
+        for _ in range(reduce_time_layers):
+            layers.extend([
+                nn.ConvTranspose1d(hidden_dim, hidden_dim, kernel_size=3, stride=2, padding=1, output_padding=1),
+                nn.GELU()
+            ])
+        self.time_upsample = nn.Sequential(*layers)
+
+        # Reduce the potential effects of padded artifacts introduced by the upsampling
+        self.conv = nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)  # Change shape to (batch_size, dim, time)
+        x = self.time_upsample(x)
+        x = self.conv(x)
+        x = x.permute(0, 2, 1)  # Revert shape to (batch_size, time, dim)
+        return x
+
+
+class BidirAutoregDecoder(nn.Module):
+    def __init__(self, in_features, out_features, upsample=False):
+        super(BidirAutoregDecoder, self).__init__()
+        self.upsample = upsample
+        if self.upsample:
+            self.upSample = Conv1dUpsampling(hidden_dim=in_features)
+        self.linear = nn.Linear(in_features, out_features)
+
+    def forward(self, x, state=None):
+        x_ntk, x_ptk = x
+        if self.upsample:
+            x_ntk = self.upSample(x_ntk)
+            x_ptk = self.upSample(x_ptk)
+        out_ntk = self.linear(x_ntk)
+        out_ptk = self.linear(x_ptk)
+        return (out_ntk, out_ptk)
+
 
 dec_registry = {
     'dummy': DummyDecoder,
@@ -351,7 +392,8 @@ dec_registry = {
     'phase-pick': PhasePickDecoder,
     'sequence-classifier': SequenceClassifier,
     'causal-decoder': CausalDecoder,
-    'convnet-decoder': ConvNetDecoder
+    'convnet-decoder': ConvNetDecoder,
+    'bidir-autoreg-decoder': BidirAutoregDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']

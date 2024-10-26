@@ -438,6 +438,7 @@ class SquashAugmentation:
 
         state_dict[self.key[0]] = (x, metadata)
 
+
 class BrainMask:
     def __init__(self, key=('X', 'y'), p1=0.5, p2=0.5):
         if isinstance(key, str):
@@ -462,7 +463,6 @@ class BrainMask:
         r = np.random.randint(0, 2)
 
         # choose random replacement strategy
-        replacement_strat = np.random.random()
 
         x, metadata = state_dict[self.key[0]]
         y = x.copy()
@@ -474,6 +474,7 @@ class BrainMask:
                 block_length = 20
                 n_blocks = int(seq_len * self.p1 / block_length)
                 for i in range(n_blocks):
+                    replacement_strat = np.random.random()
                     start_idx = np.random.randint(0, seq_len - block_length + 1)
                     self._fill_mask(x, start_idx, block_length, replacement_strat)
                     mask[start_idx:start_idx + block_length, :] = 0
@@ -487,6 +488,8 @@ class BrainMask:
 
         state_dict[self.key[0]] = ((x, np.invert(mask.astype(bool))), metadata)
         state_dict[self.key[1]] = (y, metadata)
+
+
 class RMSNormAugmentation:
     def __init__(self, key=('X', 'y'), ):
         if isinstance(key, str):
@@ -499,3 +502,15 @@ class RMSNormAugmentation:
         rms = np.sqrt(np.mean(x ** 2))
         x = x / rms
         state_dict[self.key[0]] = (x, meta_x)
+
+
+class CopyXY:
+    def __init__(self, key=('X', 'y'), ):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+
+    def __call__(self, state_dict):
+        x, meta_x = state_dict[self.key[0]]
+        state_dict[self.key[1]] = (x, meta_x)

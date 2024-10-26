@@ -52,6 +52,14 @@ def phase_pick_loss(y_pred, y_true, eps=1e-5):
     return -h
 
 
+def bidirAutoregLoss(x, y):
+    x_ntk, x_ptk = x
+    next_token_loss = F.mse_loss(x_ntk[:, :-2, :], y)
+    prev_token_loss = F.mse_loss(x_ptk[:, 2:, :], y)
+    return next_token_loss + prev_token_loss
+
+
+
 metric_functions = {
     'mse': mse,
     'log_mse': log_mse,
@@ -61,4 +69,5 @@ metric_functions = {
     'cross-entropy': cross_entropy,
     'cross-entropy-context': cross_entropy_with_context,
     'phase-pick': phase_pick_loss,
+    'bidir-autoreg-loss': bidirAutoregLoss,
 }
