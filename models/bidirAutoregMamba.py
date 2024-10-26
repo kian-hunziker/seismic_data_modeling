@@ -123,14 +123,14 @@ class BidirAutoregMamba(nn.Module):
 
             if (
                     l + 1) == self.n_layers - 1:  # use the hidden states from the second last layer for next token prediction
-                print('hidden_states_ntp', hidden_states[0, :10, 0])
+                #print('hidden_states_ntp', hidden_states[0, :10, 0])
                 # if residual is not None:
-                print('residual', residual[0, :10, 0])
+                #print('residual', residual[0, :10, 0])
                 hidden_states_NTP = hidden_states + residual
             elif (l + 1) == self.n_layers:  # use the hidden states from the last layer for previous token prediction
-                print('hidden_states_ptk', hidden_states[0, :10, 0])
+                #print('hidden_states_ptk', hidden_states[0, :10, 0])
                 # if residual is not None:
-                print('residual', residual[0, :10, 0])
+                #print('residual', residual[0, :10, 0])
                 hidden_states_PTP = hidden_states + residual
 
         X_NTK = self.ln_f(hidden_states_NTP)
