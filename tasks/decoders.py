@@ -375,6 +375,7 @@ class BidirAutoregDecoder(nn.Module):
     def forward(self, x, state=None):
         x_ntk, x_ptk, x_tokens = x
         if self.upsample:
+            x_tokens = None
             x_ntk = self.upSample(x_ntk)
             x_ptk = self.upSample(x_ptk)
         out_ntk = self.linear(x_ntk)
