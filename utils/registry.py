@@ -28,6 +28,8 @@ model = {
     "identity": "models.simple_test_models.IdentityModel",
     "phase-net": "models.phasenet_wrapper.PhaseNetWrapper",
     "hybrid-sashimi": "models.sashimi.sashimi_hybrid.HybridSashimi",
+    "pure-hydra": "models.pure_hydra.PureHydra",
+    "hydra-unet": "models.hydra_models.hydra_unet.HydraUnet",
 }
 
 dataset = {
