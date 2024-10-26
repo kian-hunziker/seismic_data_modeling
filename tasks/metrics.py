@@ -53,9 +53,13 @@ def phase_pick_loss(y_pred, y_true, eps=1e-5):
 
 
 def bidirAutoregLoss(x, y):
-    x_ntk, x_ptk = x
-    next_token_loss = F.mse_loss(x_ntk[:, :-2, :], y)
-    prev_token_loss = F.mse_loss(x_ptk[:, 2:, :], y)
+    x_ntk, x_ptk, x_tokens = x
+    if x_tokens is None:
+        next_token_loss = F.mse_loss(x_ntk[:, :-2, :], y)
+        prev_token_loss = F.mse_loss(x_ptk[:, 2:, :], y)
+    else:
+        next_token_loss = F.mse_loss(x_ntk[:, :-2, :], x_tokens)
+        prev_token_loss = F.mse_loss(x_ptk[:, 2:, :], x_tokens)
     return next_token_loss + prev_token_loss
 
 
