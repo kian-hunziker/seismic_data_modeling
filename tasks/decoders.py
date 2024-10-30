@@ -390,9 +390,16 @@ class BidirPhasePickDecoder(nn.Module):
         if self.upsample:
             self.upSample = Conv1dUpsampling(hidden_dim=in_features)
 
-        self.linear = nn.Linear(2 * in_features, 2 * in_features)
+        self.linear = nn.Linear(in_features, in_features)
+        self.conv_1 = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=in_features,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        )
         self.out_conv = nn.Conv1d(
-            in_channels=2 * in_features,
+            in_channels=in_features,
             out_channels=out_features,
             kernel_size=kernel_size,
             stride=1,
@@ -402,11 +409,46 @@ class BidirPhasePickDecoder(nn.Module):
     def forward(self, x, state=None):
         x_ntk, x_ptk, _ = x
         if self.upsample:
-            x_ntk = self.upSample(x_ntk)
-            x_ptk = self.upSample(x_ptk)
-        out = torch.cat([x_ntk, x_ptk], dim=-1)
-        out = F.gelu(self.linear(out))
-        out = self.out_conv(out.transpose(1, 2)).transpose(1, 2)[:, 4:-4, :]
+            #x_ntk = self.upSample(x_ntk)
+            out = self.upSample(x_ptk)
+        #out = torch.cat([x_ntk, x_ptk], dim=-1)
+        out = F.gelu(self.conv_1(out.transpose(1, 2)))
+        out = self.out_conv(out).transpose(1, 2)[:, 4:-4, :]
+        return out
+
+class BidirPhasePickDecoderSmall(nn.Module):
+    def __init__(self, in_features, out_features, upsample=True, kernel_size=33):
+        super(BidirPhasePickDecoderSmall, self).__init__()
+        self.upsample = upsample
+
+        self.out_conv = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=out_features,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=int(kernel_size // 2),
+        )
+        if self.upsample:
+            self.upSample = Conv1dUpsampling(hidden_dim=out_features)
+        self.out_proj = nn.Conv1d(
+            in_channels=out_features,
+            out_channels=out_features,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        )
+
+    def forward(self, x, state=None):
+        if len(x) == 2:
+            x_ptk = x[0]
+        elif len(x) == 3:
+            x_ptk = x[1]
+        else:
+            x_ptk = x
+        out = self.out_conv(x_ptk.transpose(1, 2)).transpose(1, 2)
+        if self.upsample:
+            out = self.upSample(out)
+        out = self.out_proj(out.transpose(1, 2)).transpose(1, 2)
         return out
 
 
@@ -423,6 +465,7 @@ dec_registry = {
     'convnet-decoder': ConvNetDecoder,
     'bidir-autoreg-decoder': BidirAutoregDecoder,
     'bidir-phasepick-decoder': BidirPhasePickDecoder,
+    'bidir-phasepick-decoder-small': BidirPhasePickDecoderSmall,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
