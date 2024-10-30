@@ -452,6 +452,18 @@ class BidirPhasePickDecoderSmall(nn.Module):
         return out
 
 
+class UpsamplingDecoder(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(UpsamplingDecoder, self).__init__()
+        self.upSample = Conv1dUpsampling(hidden_dim=in_features)
+        self.linear = nn.Linear(in_features, out_features)
+
+    def forward(self, x, state=None):
+        out = self.upSample(x)
+        out = self.linear(out)
+        return out
+
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -466,6 +478,7 @@ dec_registry = {
     'bidir-autoreg-decoder': BidirAutoregDecoder,
     'bidir-phasepick-decoder': BidirPhasePickDecoder,
     'bidir-phasepick-decoder-small': BidirPhasePickDecoderSmall,
+    'upsampling-decoder': UpsamplingDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']

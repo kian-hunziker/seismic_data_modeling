@@ -397,8 +397,10 @@ class Conv1dSubampling(nn.Module):
 
 
 class BidirAutoregEncoder(nn.Module):
-    def __init__(self, in_features, out_features, dropout: float = 0.0):
+    def __init__(self, in_features, out_features, dropout: float = 0.0, mask: float = 0.0):
         super(BidirAutoregEncoder, self).__init__()
+        self.mask = mask
+        self.num_zero_elements = 10
         self.conv_subsampling = Conv1dSubampling(
             in_channels=in_features,
             out_channels=out_features,
@@ -412,6 +414,14 @@ class BidirAutoregEncoder(nn.Module):
     def forward(self, x):
         x, x_tokens = self.conv_subsampling(x)
         x = self.input_projection(x)
+        if self.mask > 0:
+            batch_size, seq_len, channels = x.shape
+            num_masking_points = int(seq_len * self.mask)
+            for batch_idx in range(batch_size):
+                mask_indices = torch.randperm(seq_len - self.num_zero_elements - 1)[:num_masking_points]
+                for start_idx in mask_indices:
+                    end_idx = min(start_idx + self.num_zero_elements, seq_len)
+                    x[batch_idx, start_idx:end_idx, :] = 0
         return (x, x_tokens)
 
 
