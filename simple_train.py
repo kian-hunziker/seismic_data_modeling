@@ -418,14 +418,15 @@ def load_checkpoint(
 @hydra.main(version_base=None, config_path="configs", config_name="config.yaml")
 def main(config: OmegaConf) -> None:
     try:
+
+        trainer = create_trainer(config)
+
         print('*' * 32)
         print('CONFIGURATION')
         print(OmegaConf.to_yaml(config))
         print('*' * 32, '\n\n')
 
         print(f'Cuda available: {torch.cuda.is_available()}')
-
-        trainer = create_trainer(config)
 
         preload = config.dataset.get('_name_') in registry.preloadable_datasets
         if preload:
