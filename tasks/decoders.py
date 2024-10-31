@@ -341,6 +341,7 @@ class ConvNetDecoder(nn.Module):
         x = self.conv2(x)
         return x.transpose(1, 2)
 
+
 class Conv1dUpsampling(nn.Module):
     def __init__(self, hidden_dim: int, reduce_time_layers: int = 2):
         super(Conv1dUpsampling, self).__init__()
@@ -410,12 +411,13 @@ class BidirPhasePickDecoder(nn.Module):
     def forward(self, x, state=None):
         x_ntk, x_ptk, _ = x
         if self.upsample:
-            #x_ntk = self.upSample(x_ntk)
+            # x_ntk = self.upSample(x_ntk)
             out = self.upSample(x_ptk)
-        #out = torch.cat([x_ntk, x_ptk], dim=-1)
+        # out = torch.cat([x_ntk, x_ptk], dim=-1)
         out = F.gelu(self.conv_1(out.transpose(1, 2)))
         out = self.out_conv(out).transpose(1, 2)[:, 4:-4, :]
         return out
+
 
 class BidirPhasePickDecoderSmall(nn.Module):
     def __init__(self, in_features, out_features, upsample=True, kernel_size=33):
@@ -519,6 +521,7 @@ class UpPool(nn.Module):
         state = list(torch.unbind(state, dim=-1))  # List of (..., H)
         return state
 
+
 class CausalUpsamplingDecoder(nn.Module):
     def __init__(self, in_features, out_features):
         super(CausalUpsamplingDecoder, self).__init__()
@@ -528,12 +531,13 @@ class CausalUpsamplingDecoder(nn.Module):
             pool=4,
             transposed=False,
         )
-        self.linear = nn.Linear(in_features//4, out_features)
+        self.linear = nn.Linear(in_features // 4, out_features)
 
     def forward(self, x, state=None):
         x, _ = self.upSample(x)
         x = self.linear(x)
         return x
+
 
 class CausalBidirAutoregDecoder(nn.Module):
     def __init__(self, in_features, out_features, upsample=False):
@@ -541,15 +545,14 @@ class CausalBidirAutoregDecoder(nn.Module):
         self.upsample = upsample
         if self.upsample:
             self.upPool = UpPool(
-            d_input=in_features,
-            expand=4,
-            pool=4,
-            transposed=False,
-        )
-            self.linear = nn.Linear(in_features//4, out_features)
+                d_input=in_features,
+                expand=4,
+                pool=4,
+                transposed=False,
+            )
+            self.linear = nn.Linear(in_features // 4, out_features)
         else:
             self.linear = nn.Linear(in_features, out_features)
-            
 
     def forward(self, x, state=None):
         x_ntk, x_ptk, x_tokens = x
@@ -560,6 +563,46 @@ class CausalBidirAutoregDecoder(nn.Module):
         out_ntk = self.linear(x_ntk)
         out_ptk = self.linear(x_ptk)
         return (out_ntk, out_ptk, x_tokens)
+
+
+class SanityCheckPhasePicker(nn.Module):
+    def __init__(self, in_features, out_features, upsample: bool = False, output_len: int = 4096):
+        super().__init__()
+        self.upsample = upsample
+        self.output_len = output_len
+
+        self.linear1 = nn.Linear(in_features, 4 * out_features)
+        self.linear2 = nn.Linear(4 * out_features, 4 * out_features)
+        self.linear3 = nn.Linear(4 * out_features, out_features)
+
+        self.conv = nn.Conv1d(
+            in_channels=out_features,
+            out_channels=out_features,
+            kernel_size=7,
+            stride=1,
+            padding=3
+        )
+
+    def forward(self, x, state=None):
+        if isinstance(x, tuple) or isinstance(x, list):
+            if len(x) == 3:
+                x = x[1]
+            elif len(x) == 2:
+                x = x[0]
+        seq_len = x.shape[1]
+
+        x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))
+        x = self.linear3(x)
+        x = x.transpose(1, 2)
+        if self.upsample:
+            x = F.interpolate(x, size=4 * seq_len, mode='linear')
+        x = self.conv(x).transpose(1, 2)
+        len_diff = x.shape[1] - self.output_len
+        if len_diff > 0:
+            x = x[:, len_diff // 2: - len_diff // 2, :]
+        return x
+
 
 dec_registry = {
     'dummy': DummyDecoder,
@@ -578,6 +621,7 @@ dec_registry = {
     'upsampling-decoder': UpsamplingDecoder,
     'causal-upsampling-decoder': CausalUpsamplingDecoder,
     'causal-bidir-autoreg-decoder': CausalBidirAutoregDecoder,
+    'sanity-check-decoder': SanityCheckPhasePicker,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
