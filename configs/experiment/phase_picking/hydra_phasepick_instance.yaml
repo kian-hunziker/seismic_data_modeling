@@ -5,28 +5,24 @@ defaults:
   - /loader: default
   - /dataset: seisbench_phase
   - /task: phase_pick
-  - /optimizer: adamw_mamba
-  - /scheduler: cosine_warmup
-  - /model: sashimi #mamba_sashimi
+  - /optimizer: adamw_hydra
+  - /scheduler: linear
+  - /model: hydra_unet
 
-experiment_name: sashimi_phase_pick_INSTANCE
-
-optimizer:
-  weight_decay: 0
+experiment_name: hydra_phase_pick_INSTANCE
 
 model:
-  d_model: 16
-  n_layers: 3
+  d_model: 9
+  n_layers: 5
+  d_state: 64
+  d_conv: 7
   expand: 2
-  ff: 2
   pool:
     - 4
     - 4
-  dropout: 0.0
-  bidirectional: True
-  unet: True
-  mode: diag
-
+  headdim: 3
+  use_mem_eff_path: True
+  skip_first_res: False
 
 train:
   monitor: val/loss
@@ -36,8 +32,8 @@ dataset:
   sample_len: 4096
   bits: 0
   d_data: 3
-  norm_type: std
   dataset_name: INSTANCE
+  norm_type: std
 
 encoder:
   _name_: linear
@@ -45,6 +41,7 @@ encoder:
 decoder:
   _name_: phase-pick
   convolutional: True
+  kernel_size: 33
 
 loader:
   batch_size: 256
@@ -53,15 +50,14 @@ loader:
 #INSTANCE has 779265 training examples
 
 scheduler:
-  num_warmup_steps: 6088
-  num_training_steps: 60880
+  num_warmup_steps: 2191
+  num_training_steps: 36528
 
 trainer:
-  max_steps: 60880
-  max_epochs: 20
+  max_steps: 36528
+  max_epochs: 12
   #limit_train_batches: 0.01
   #limit_val_batches: 0.1
-  log_every_n_steps: 200
+  log_every_n_steps: 100
   val_check_interval: 0.1 #validate 10 times per epoch
   gradient_clip_val: 1.0
-

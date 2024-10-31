@@ -9,7 +9,7 @@ pool:
   - 16
 dropout: 0.0
 unet: False
-complex: False
+is_complex: False
 d_conv: 4
 
 #mode: diag

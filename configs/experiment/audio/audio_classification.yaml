@@ -39,10 +39,10 @@ train:
   #pretrained_model: wandb_logs/MA/2024-09-27__12_41_07
 
 dataset:
-  sample_len: 16384
-  sample_rate: 16000
+  sample_len: 44128
+  sample_rate: 44100
   auto_reg: False
-  channels: 1
+  channels: 2
 
 encoder:
   _name_: linear
@@ -56,14 +56,14 @@ loader:
   batch_size: 8
   drop_last: True
 
-# audio dataset currently has 3964 train examples
+# audio dataset currently has 3962 train examples
 scheduler:
-  num_warmup_steps: 600
-  num_training_steps: 6000
+  num_warmup_steps: 4950
+  num_training_steps: 49500
 
 trainer:
-  max_steps: 6000
-  max_epochs: 1000
+  max_steps: 49500
+  max_epochs: 100
   #limit_train_batches: 0.5
-  log_every_n_steps: 1
+  log_every_n_steps: 50
   #gradient_clip_val: 1.0

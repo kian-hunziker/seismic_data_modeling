@@ -5,24 +5,23 @@ defaults:
   - /loader: default
   - /dataset: seisbench_auto_reg
   - /task: regression
-  - /optimizer: adamw_mamba
-  - /scheduler: cosine_warmup
-  - /model: mamba_sashimi
+  - /optimizer: adamw_hydra
+  - /scheduler: linear
+  - /model: hydra_unet
 
-experiment_name: pretrain_STEAD_mamba_std_44_d96
+experiment_name: hydra_unet_STEAD_std
 
 model:
   d_model: 96
-  n_layers: 8
+  n_layers: 6
+  d_state: 64
+  d_conv: 33
   expand: 2
-  ff: 0
   pool:
     - 4
     - 4
-  dropout: 0.0
-  unet: True
-  d_conv: 4 # is 16 in other models, but we set it to 4 in order to use the fused kernel
-  is_complex: True
+  #headdim: 24
+  use_mem_eff_path: True
 
 train:
   monitor: val/loss
@@ -35,34 +34,35 @@ task:
     - mse
 
 dataset:
+  dataset_name: STEAD
   sample_len: 4096
   bits: 0
   d_data: 3
   normalize_first: True
-  dataset_name: STEAD
   norm_type: std
+  masking: 0.25
 
 encoder:
-  _name_: linear
+  _name_: convnet-encoder
 
 decoder:
   _name_: linear
 
 loader:
-  batch_size: 32
+  batch_size: 64
   drop_last: True
 
 # The STEAD dataset has 1075808 training examples
 # with batch size 128 and drop last true that is 8404 batches per epoch
+# batch_size 64: 16809 batches per epoch
 
 scheduler:
-  num_warmup_steps: 20000
-  num_training_steps: 200000
+  num_warmup_steps: 24000
+  num_training_steps: 400000
 
 trainer:
-  max_steps: 200000
-  max_epochs: 12
+  max_steps: 400000
+  max_epochs: 200
   gradient_clip_val: 1.0
-  log_every_n_steps: 30
-  val_check_interval: 0.02 #validate 50 times per epoch
-  #limit_val_batches: 0.5
+  log_every_n_steps: 200
+  val_check_interval: 0.1

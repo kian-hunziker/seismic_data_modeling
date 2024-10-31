@@ -9,15 +9,15 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: bidir_autoreg_mamba
 
-experiment_name: mamba_seisbench_auto_reg_norm_first
+experiment_name: mamba_bidir_autoreg_ethz
 
 model:
-  d_model: 128
-  n_layers: 16
+  d_model: 256
+  n_layers: 18
   expand: 2
   ff: 0
   dropout: 0.0
-  is_complex: False
+  is_complex: True
 
 train:
   monitor: val/loss
@@ -25,6 +25,7 @@ train:
   #chpt_path: wandb_logs/MA/
 
 dataset:
+  dataset_name: ETHZ
   sample_len: 4096
   bits: 0
   d_data: 3
@@ -32,23 +33,28 @@ dataset:
   bidir_autoreg: True
 
 encoder:
-  _name_: linear
+  _name_: bidir-autoreg-encoder
 
 decoder:
-  _name_: bidir-autoreg-decoder
+  _name_: causal-bidir-autoreg-decoder
+  upsample: True
 
 loader:
-  batch_size: 128
+  batch_size: 64
   drop_last: True
 
 # the ETHZ train dataset has 22626 traces
 # with batch size 128 and drop last true that is 176 batches per epoch
 
+# takes roughly 17-18min per epoch (with batch_size 128 on rtx4090) and approx 15min with batch_size 64
+
 scheduler:
-  num_warmup_steps: 5280
-  num_training_steps: 52800
+  num_warmup_steps: 3530
+  num_training_steps: 35300
 
 trainer:
-  max_steps: 52800
-  max_epochs: 300
+  max_steps: 35300
+  max_epochs: 100
+  log_every_n_steps: 50
+  val_check_interval: 0.5
   gradient_clip_val: 1.0

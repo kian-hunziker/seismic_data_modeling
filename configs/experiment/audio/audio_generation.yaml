@@ -9,7 +9,10 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: mamba_sashimi
 
-experiment_name: audio_generation
+experiment_name: audio_generation_kick_lr001
+
+optimizer:
+ lr: 0.001
 
 model:
   d_model: 64
@@ -17,8 +20,8 @@ model:
   expand: 2
   ff: 0
   pool:
-    - 4
-    - 4
+    - 16
+    - 16
   dropout: 0.0
   unet: False
   d_conv: 16
@@ -27,7 +30,7 @@ model:
 train:
   monitor: val/loss
   mode: min
-  #chpt_path: wandb_logs/MA/
+  #ckpt_path: wandb_logs/MA/2024-09-29__16_46_44
 
 task:
   metrics:
@@ -35,15 +38,16 @@ task:
     - mse
 
 dataset:
-  sample_len: 44128
+  sample_len: 32768
   sample_rate: 44100
   auto_reg: True
-  return_labels: True
+  return_labels: False
   channels: 2
 
 encoder:
-  _name_: conditional-linear
-  num_classes: 6
+  _name_: linear
+  #_name_: conditional-linear
+  #num_classes: 6
 
 decoder:
   _name_: linear
@@ -55,10 +59,10 @@ loader:
 # audio dataset currently has 3964 train examples
 
 scheduler:
-  num_warmup_steps: 4940
-  num_training_steps: 49400
+  num_warmup_steps: 4020
+  num_training_steps: 40200
 
 trainer:
-  max_steps: 49400
-  max_epochs: 200
+  max_steps: 40200
+  max_epochs: 600
   gradient_clip_val: 1.0

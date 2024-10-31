@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from dataloaders.base import SeisbenchDataLit
 from dataloaders.data_utils.seisbench_utils.augmentations import QuantizeAugmentation, FilterZChannel, \
     FillMissingComponents, AutoregressiveShift, TransposeLabels, TransposeSeqChannels, RandomMask, \
-    SquashAugmentation, ChunkMask, BertStyleMask, BrainMask, RMSNormAugmentation, CopyXY
+    SquashAugmentation, ChunkMask, BertStyleMask, BrainMask, RMSNormAugmentation, CopyXY, PretrainMask
 from evaluation.eval_sashimi import moving_average
 
 from dataloaders.data_utils.signal_encoding import quantize_encode, decode_dequantize, normalize_11_torch, normalize_11
@@ -167,7 +167,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         self.setup()
 
     def setup(self):
-        window_len = self.sample_len + 1 if self.masking == 0 else self.sample_len
+        window_len = self.sample_len + 1 if self.masking == 0 and not self.bidir_autoreg else self.sample_len
 
         '''
         sbg.Normalize(
@@ -202,7 +202,7 @@ class SeisBenchAutoReg(SeisbenchDataLit):
         if self.bidir_autoreg:
             augmentations.append(CopyXY())
         else:
-            augmentations.append(AutoregressiveShift() if self.masking == 0 else BrainMask(p1=self.masking, p2=0.5))
+            augmentations.append(AutoregressiveShift() if self.masking == 0 else PretrainMask(p=self.masking))
 
         augmentations = remove_unused_augmentations(augmentations)
 

@@ -5,26 +5,25 @@ defaults:
   - /loader: default
   - /dataset: seisbench_phase
   - /task: phase_pick
-  - /optimizer: adamw_mamba
-  - /scheduler: cosine_warmup
-  - /model: mamba_sashimi
+  - /optimizer: adamw_hydra
+  - /scheduler: linear
+  - /model: hydra_unet
 
-experiment_name: sashimi_phase_pick_mamba_small_decoder
+experiment_name: hydra_phase_pick_ETHZ
 
 model:
-  d_model: 16
-  n_layers: 3
+  d_model: 9
+  n_layers: 5
+  d_state: 64
+  d_conv: 7
   expand: 2
-  ff: 0
   pool:
     - 4
     - 4
-  dropout: 0.0
-  #bidirectional: True
-  unet: True
-  is_complex: True
-  #mode: diag
-
+  headdim: 3
+  use_mem_eff_path: True
+  skip_first_res: False
+  dropout: 0.2
 
 train:
   monitor: val/loss
@@ -40,6 +39,8 @@ dataset:
   sample_len: 4096
   bits: 0
   d_data: 3
+  dataset_name: ETHZ
+  norm_type: std
 
 encoder:
   _name_: linear
@@ -51,15 +52,19 @@ decoder:
 
 loader:
   batch_size: 256
+  drop_last: True
+
+#INSTANCE has 779265 training examples
 
 scheduler:
-  num_warmup_steps: 890
-  num_training_steps: 8900
+  num_warmup_steps: 528
+  num_training_steps: 8800
 
 trainer:
-  max_steps: 8900
+  max_steps: 8800
   max_epochs: 100
   #limit_train_batches: 0.01
   #limit_val_batches: 0.1
-  log_every_n_steps: 10
+  log_every_n_steps: 20
+  val_check_interval: 0.5 #validate 2 times per epoch
   gradient_clip_val: 1.0

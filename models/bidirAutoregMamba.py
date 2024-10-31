@@ -132,6 +132,7 @@ class BidirAutoregMamba(nn.Module):
                 # if residual is not None:
                 #print('residual', residual[0, :10, 0])
                 hidden_states_PTP = hidden_states + residual
+                hidden_states_PTP = torch.flip(hidden_states_PTP, [1])
 
         X_NTK = self.ln_f(hidden_states_NTP)
         X_PTK = self.ln_f(hidden_states_PTP)

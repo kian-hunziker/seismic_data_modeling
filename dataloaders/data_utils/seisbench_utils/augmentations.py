@@ -489,6 +489,53 @@ class BrainMask:
         state_dict[self.key[0]] = ((x, np.invert(mask.astype(bool))), metadata)
         state_dict[self.key[1]] = (y, metadata)
 
+class PretrainMask:
+    def __init__(self, key=('X', 'y'), p=0.75):
+        if isinstance(key, str):
+            self.key = (key, key)
+        else:
+            self.key = key
+        self.p = p
+
+    def _fill_mask(self, x_in, start_idx, block_length, strategy):
+        if strategy < 0.8:
+            # zero out with 80% chance
+            x_in[start_idx:start_idx + block_length, :] = 0
+        elif strategy < 0.9:
+            # random noise with 10% chance
+            std = np.std(x_in[start_idx:start_idx + block_length], keepdims=True)
+            x_in[start_idx:start_idx + block_length, :] = std * np.random.randn(block_length, 3)
+        # do nothing with 10% chance
+
+    def __call__(self, state_dict):
+        # choose random masking task
+        r = np.random.randint(0, 4)
+
+        x, metadata = state_dict[self.key[0]]
+        y = x.copy()
+        seq_len = x.shape[0]
+        mask = np.ones_like(x)
+        try:
+            if r == 0 or r == 1:
+                # mask self.p percent of sequence with blocks of 20 samples
+                block_length = 20
+            elif r == 2:
+                block_length = 50
+            else:
+                block_length = 100
+            n_blocks = int(seq_len * self.p / block_length)
+            for i in range(n_blocks):
+                replacement_strat = np.random.random()
+                start_idx = np.random.randint(0, seq_len - block_length + 1)
+                self._fill_mask(x, start_idx, block_length, replacement_strat)
+                mask[start_idx:start_idx + block_length, :] = 0
+
+        except:
+            print('could not generate mask')
+
+        state_dict[self.key[0]] = ((x, np.invert(mask.astype(bool))), metadata)
+        state_dict[self.key[1]] = (y, metadata)
+
 
 class RMSNormAugmentation:
     def __init__(self, key=('X', 'y'), ):

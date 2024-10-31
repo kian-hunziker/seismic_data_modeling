@@ -8,6 +8,7 @@ from tasks.positional_encoding import PositionalEncoding
 
 from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
 from models.sashimi.sashimi_standalone import UpPool, FFBlock, ResidualBlock
+from einops import rearrange
 
 from omegaconf import OmegaConf
 
@@ -390,9 +391,16 @@ class BidirPhasePickDecoder(nn.Module):
         if self.upsample:
             self.upSample = Conv1dUpsampling(hidden_dim=in_features)
 
-        self.linear = nn.Linear(2 * in_features, 2 * in_features)
+        self.linear = nn.Linear(in_features, in_features)
+        self.conv_1 = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=in_features,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        )
         self.out_conv = nn.Conv1d(
-            in_channels=2 * in_features,
+            in_channels=in_features,
             out_channels=out_features,
             kernel_size=kernel_size,
             stride=1,
@@ -402,11 +410,46 @@ class BidirPhasePickDecoder(nn.Module):
     def forward(self, x, state=None):
         x_ntk, x_ptk, _ = x
         if self.upsample:
-            x_ntk = self.upSample(x_ntk)
-            x_ptk = self.upSample(x_ptk)
-        out = torch.cat([x_ntk, x_ptk], dim=-1)
-        out = F.gelu(self.linear(out))
-        out = self.out_conv(out.transpose(1, 2)).transpose(1, 2)[:, 4:-4, :]
+            #x_ntk = self.upSample(x_ntk)
+            out = self.upSample(x_ptk)
+        #out = torch.cat([x_ntk, x_ptk], dim=-1)
+        out = F.gelu(self.conv_1(out.transpose(1, 2)))
+        out = self.out_conv(out).transpose(1, 2)[:, 4:-4, :]
+        return out
+
+class BidirPhasePickDecoderSmall(nn.Module):
+    def __init__(self, in_features, out_features, upsample=True, kernel_size=33):
+        super(BidirPhasePickDecoderSmall, self).__init__()
+        self.upsample = upsample
+
+        self.out_conv = nn.Conv1d(
+            in_channels=in_features,
+            out_channels=out_features,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=int(kernel_size // 2),
+        )
+        if self.upsample:
+            self.upSample = Conv1dUpsampling(hidden_dim=out_features)
+        self.out_proj = nn.Conv1d(
+            in_channels=out_features,
+            out_channels=out_features,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        )
+
+    def forward(self, x, state=None):
+        if len(x) == 2:
+            x_ptk = x[0]
+        elif len(x) == 3:
+            x_ptk = x[1]
+        else:
+            x_ptk = x
+        out = self.out_conv(x_ptk.transpose(1, 2)).transpose(1, 2)
+        if self.upsample:
+            out = self.upSample(out)
+        out = self.out_proj(out.transpose(1, 2)).transpose(1, 2)
         return out
 
 
@@ -422,6 +465,102 @@ class UpsamplingDecoder(nn.Module):
         return out
 
 
+class UpPool(nn.Module):
+    def __init__(self, d_input, expand, pool, transposed=True):
+        """
+        if transposed is True, the input is [batch_size, H, seq_len]
+        else: [batch_size, seq_len, H]
+        """
+        super().__init__()
+        self.d_output = d_input // expand
+        self.pool = pool
+        self.transposed = transposed
+
+        self.linear = LinearActivation(
+            d_input,
+            self.d_output * pool,
+            transposed=True,
+        )
+
+    def forward(self, x, skip=None):
+        if not self.transposed:
+            x = x.transpose(1, 2)
+        x = self.linear(x)
+
+        x = F.pad(x[..., :-1], (1, 0))  # Shift to ensure causality
+        x = rearrange(x, '... (h s) l -> ... h (l s)', s=self.pool)
+
+        if skip is not None:
+            x = x + skip
+        if not self.transposed:
+            x = x.transpose(1, 2)
+        return x, None
+
+    def step(self, x, state, **kwargs):
+        """
+        x: (..., H)
+        """
+        assert len(state) > 0
+        y, state = state[0], state[1:]
+        if len(state) == 0:
+            assert x is not None
+            squeeze_idx = -1 if self.transposed else 1
+            x = x.unsqueeze(-1)
+            x = self.linear(x)
+            x = x.squeeze(-1)
+            x = rearrange(x, '... (h s) -> ... h s', s=self.pool)
+            state = list(torch.unbind(x, dim=-1))
+        else:
+            assert x is None
+        return y, state
+
+    def default_state(self, *batch_shape, device=None):
+        state = torch.zeros(batch_shape + (self.d_output, self.pool), device=device)  # (batch, h, s)
+        state = list(torch.unbind(state, dim=-1))  # List of (..., H)
+        return state
+
+class CausalUpsamplingDecoder(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(CausalUpsamplingDecoder, self).__init__()
+        self.upSample = UpPool(
+            d_input=in_features,
+            expand=4,
+            pool=4,
+            transposed=False,
+        )
+        self.linear = nn.Linear(in_features//4, out_features)
+
+    def forward(self, x, state=None):
+        x, _ = self.upSample(x)
+        x = self.linear(x)
+        return x
+
+class CausalBidirAutoregDecoder(nn.Module):
+    def __init__(self, in_features, out_features, upsample=False):
+        super(CausalBidirAutoregDecoder, self).__init__()
+        self.upsample = upsample
+        if self.upsample:
+            self.upPool = UpPool(
+            d_input=in_features,
+            expand=4,
+            pool=4,
+            transposed=False,
+        )
+            self.linear = nn.Linear(in_features//4, out_features)
+        else:
+            self.linear = nn.Linear(in_features, out_features)
+            
+
+    def forward(self, x, state=None):
+        x_ntk, x_ptk, x_tokens = x
+        if self.upsample:
+            x_tokens = None
+            x_ntk, _ = self.upPool(x_ntk)
+            x_ptk, _ = self.upPool(x_ptk)
+        out_ntk = self.linear(x_ntk)
+        out_ptk = self.linear(x_ptk)
+        return (out_ntk, out_ptk, x_tokens)
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -435,7 +574,10 @@ dec_registry = {
     'convnet-decoder': ConvNetDecoder,
     'bidir-autoreg-decoder': BidirAutoregDecoder,
     'bidir-phasepick-decoder': BidirPhasePickDecoder,
+    'bidir-phasepick-decoder-small': BidirPhasePickDecoderSmall,
     'upsampling-decoder': UpsamplingDecoder,
+    'causal-upsampling-decoder': CausalUpsamplingDecoder,
+    'causal-bidir-autoreg-decoder': CausalBidirAutoregDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']

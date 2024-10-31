@@ -5,24 +5,20 @@ defaults:
   - /loader: default
   - /dataset: seisbench_auto_reg
   - /task: regression
-  - /optimizer: adamw_mamba
-  - /scheduler: cosine_warmup
-  - /model: mamba_sashimi
+  - /optimizer: adamw_hydra
+  - /scheduler: linear
+  - /model: pure_hydra
 
-experiment_name: mamba_sash_ethz
+experiment_name: pure_hydra_downsample_ethz_50
 
 model:
-  d_model: 64
-  n_layers: 9
+  d_model: 256
+  n_layers: 24
+  d_state: 64
+  d_conv: 7
   expand: 2
-  ff: 0
-  pool:
-    - 4
-    - 4
-  dropout: 0.0
-  unet: True
-  d_conv: 4
-  is_complex: True
+  headdim: 256
+  use_mem_eff_path: True
 
 train:
   monitor: val/loss
@@ -40,13 +36,15 @@ dataset:
   bits: 0
   d_data: 3
   norm_type: std
+  #bidir_autoreg: True
+  masking: 0.5
 
-  
 encoder:
-  _name_: linear
+  _name_: bidir-autoreg-encoder
+  #mask: 0.01
 
 decoder:
-  _name_: linear
+  _name_: upsampling-decoder
 
 loader:
   batch_size: 64
@@ -55,15 +53,15 @@ loader:
 # the ETHZ train dataset has 22626 traces
 # with batch size 128 and drop last true that is 176 batches per epoch
 
-# approx 14min per epoch on rtx4090 with batch size 64
+# approx 5min per epoch
 
 scheduler:
-  num_warmup_steps: 3530
+  num_warmup_steps: 2118
   num_training_steps: 35300
 
 trainer:
   max_steps: 35300
   max_epochs: 100
+  gradient_clip_val: 1.0
   log_every_n_steps: 50
   val_check_interval: 0.5
-  gradient_clip_val: 1.0

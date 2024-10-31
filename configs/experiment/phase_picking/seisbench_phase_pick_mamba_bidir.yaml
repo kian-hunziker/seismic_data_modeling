@@ -9,10 +9,10 @@ defaults:
   - /scheduler: cosine_warmup
   - /model: mamba_sashimi
 
-experiment_name: sashimi_phase_pick_mamba_bidir
+experiment_name: mama_pp_bidir_INSTANCE
 
 model:
-  d_model: 16
+  d_model: 8
   n_layers: 3
   expand: 2
   ff: 0
@@ -21,8 +21,9 @@ model:
     - 4
   dropout: 0.0
   bidirectional: True
-  unet: False
+  unet: True
   is_complex: False
+  d_state: 128
   #mode: diag
 
 train:
@@ -39,6 +40,8 @@ dataset:
   sample_len: 4096
   bits: 0
   d_data: 3
+  dataset_name: INSTANCE
+  norm_type: std
 
 encoder:
   _name_: linear
@@ -46,19 +49,23 @@ encoder:
 decoder:
   _name_: phase-pick
   convolutional: True
-  kernel_size: 129
+  kernel_size: 33
 
 loader:
   batch_size: 256
+  drop_last: True
+
+#INSTANCE has 779265 training examples
 
 scheduler:
-  num_warmup_steps: 890
-  num_training_steps: 8900
+  num_warmup_steps: 12180
+  num_training_steps: 121800
 
 trainer:
-  max_steps: 8900
-  max_epochs: 100
+  max_steps: 121800
+  max_epochs: 40
   #limit_train_batches: 0.01
   #limit_val_batches: 0.1
-  log_every_n_steps: 10
+  log_every_n_steps: 200
+  val_check_interval: 0.2 #validate 5 times per epoch
   gradient_clip_val: 1.0
