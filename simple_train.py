@@ -36,6 +36,10 @@ import logging
 # ignore INFO level logging
 seisbench.logger.setLevel(logging.WARNING)
 
+# fix random seeds
+torch.random.manual_seed(0)
+np.random.seed(0)
+
 
 class SimpleSeqModel(pl.LightningModule):
     def __init__(self, config, d_data: int = 3):
@@ -271,7 +275,7 @@ class SimpleSeqModel(pl.LightningModule):
 
 def create_trainer(config):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d__%H_%M_%S")
-    model_name = config.model['_name_']
+    #model_name = config.model['_name_']
     experiment_name = config.experiment_name
 
     # setup logger
