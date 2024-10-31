@@ -8,6 +8,7 @@ from tasks.positional_encoding import PositionalEncoding
 
 from models.sashimi.s4_standalone import LinearActivation, S4Block as S4
 from models.sashimi.sashimi_standalone import UpPool, FFBlock, ResidualBlock
+from einops import rearrange
 
 from omegaconf import OmegaConf
 
@@ -464,6 +465,102 @@ class UpsamplingDecoder(nn.Module):
         return out
 
 
+class UpPool(nn.Module):
+    def __init__(self, d_input, expand, pool, transposed=True):
+        """
+        if transposed is True, the input is [batch_size, H, seq_len]
+        else: [batch_size, seq_len, H]
+        """
+        super().__init__()
+        self.d_output = d_input // expand
+        self.pool = pool
+        self.transposed = transposed
+
+        self.linear = LinearActivation(
+            d_input,
+            self.d_output * pool,
+            transposed=True,
+        )
+
+    def forward(self, x, skip=None):
+        if not self.transposed:
+            x = x.transpose(1, 2)
+        x = self.linear(x)
+
+        x = F.pad(x[..., :-1], (1, 0))  # Shift to ensure causality
+        x = rearrange(x, '... (h s) l -> ... h (l s)', s=self.pool)
+
+        if skip is not None:
+            x = x + skip
+        if not self.transposed:
+            x = x.transpose(1, 2)
+        return x, None
+
+    def step(self, x, state, **kwargs):
+        """
+        x: (..., H)
+        """
+        assert len(state) > 0
+        y, state = state[0], state[1:]
+        if len(state) == 0:
+            assert x is not None
+            squeeze_idx = -1 if self.transposed else 1
+            x = x.unsqueeze(-1)
+            x = self.linear(x)
+            x = x.squeeze(-1)
+            x = rearrange(x, '... (h s) -> ... h s', s=self.pool)
+            state = list(torch.unbind(x, dim=-1))
+        else:
+            assert x is None
+        return y, state
+
+    def default_state(self, *batch_shape, device=None):
+        state = torch.zeros(batch_shape + (self.d_output, self.pool), device=device)  # (batch, h, s)
+        state = list(torch.unbind(state, dim=-1))  # List of (..., H)
+        return state
+
+class CausalUpsamplingDecoder(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(CausalUpsamplingDecoder, self).__init__()
+        self.upSample = UpPool(
+            d_input=in_features,
+            expand=4,
+            pool=4,
+            transposed=False,
+        )
+        self.linear = nn.Linear(in_features//4, out_features)
+
+    def forward(self, x, state=None):
+        x, _ = self.upSample(x)
+        x = self.linear(x)
+        return x
+
+class CausalBidirAutoregDecoder(nn.Module):
+    def __init__(self, in_features, out_features, upsample=False):
+        super(CausalBidirAutoregDecoder, self).__init__()
+        self.upsample = upsample
+        if self.upsample:
+            self.upPool = UpPool(
+            d_input=in_features,
+            expand=4,
+            pool=4,
+            transposed=False,
+        )
+            self.linear = nn.Linear(in_features//4, out_features)
+        else:
+            self.linear = nn.Linear(in_features, out_features)
+            
+
+    def forward(self, x, state=None):
+        x_ntk, x_ptk, x_tokens = x
+        if self.upsample:
+            x_tokens = None
+            x_ntk, _ = self.upPool(x_ntk)
+            x_ptk, _ = self.upPool(x_ptk)
+        out_ntk = self.linear(x_ntk)
+        out_ptk = self.linear(x_ptk)
+        return (out_ntk, out_ptk, x_tokens)
+
 dec_registry = {
     'dummy': DummyDecoder,
     'linear': LinearDecoder,
@@ -479,6 +576,8 @@ dec_registry = {
     'bidir-phasepick-decoder': BidirPhasePickDecoder,
     'bidir-phasepick-decoder-small': BidirPhasePickDecoderSmall,
     'upsampling-decoder': UpsamplingDecoder,
+    'causal-upsampling-decoder': CausalUpsamplingDecoder,
+    'causal-bidir-autoreg-decoder': CausalBidirAutoregDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
