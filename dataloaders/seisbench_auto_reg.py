@@ -367,6 +367,38 @@ def phase_pick_test():
         print(f'autoreg_mse: {autoreg_mse :.4f}, log_mse: {torch.log(autoreg_mse):.4f}')
     print('total_avg: ', total_avg / len(loader))
 
+def bidir_autoreg_test():
+    data_config = {
+        'sample_len': 4096,
+        'bits': 0,
+        'd_data': 3,
+        'normalize_first': True,
+        'dataset_name': ['ETHZ'],
+        'norm_type': 'std',
+        'bidir_autoreg': True,
+    }
+    loader_config = {
+        'batch_size': 64,
+        'num_workers': 0,
+        'shuffle': True,
+    }
+    dataset = SeisBenchAutoReg(**data_config)
+    loader = DataLoader(dataset.dataset_val, **loader_config)
+
+    batch = next(iter(loader))
+    print(len(loader.dataset))
+    total_avg = 0
+    for i, batch in enumerate(loader):
+        x, y = batch['X'], batch['y']
+        l1 = torch.nn.functional.mse_loss(x[:, 1:, :], y[:, :-1, :])
+        l2 = torch.nn.functional.mse_loss(x[:, :-1, :], y[:, 1:, :])
+        print(f'bidir loss: {l1 + l2 :.4f}')
+        total_avg += l1 + l2
+    print('total_avg: ', total_avg / len(loader))
+
+
+
 
 if __name__ == "__main__":
-    phase_pick_test()
+    #phase_pick_test()
+    bidir_autoreg_test()
