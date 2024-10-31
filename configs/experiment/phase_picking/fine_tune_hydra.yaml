@@ -5,18 +5,15 @@ defaults:
   - /loader: default
   - /dataset: seisbench_phase
   - /task: phase_pick
-  - /optimizer: adamw_mamba
-  - /scheduler: cosine_warmup
-  - /model: mamba_sashimi
+  - /optimizer: adamw_hydra
+  - /scheduler: linear
+  - /model: hydra_unet
 
-experiment_name: fine_tune_ETHZ_bidir
+experiment_name: fine_tune_hydra_ETHZ_5percent_small_lr_bs
 
 
 model:
-  #pretrained: wandb_logs/MA/2024-09-27__18_23_04 # huge, 20M params ETHZ
-  #pretrained: wandb_logs/MA/2024-09-24__17_31_26 # 6M params ETHZ
-  #pretrained: wandb_logs/MA/2024-10-13__13_54_29 # 18M params STEAD
-  pretrained: wandb_logs/MA/2024-10-16__23_49_49 # 9.5M params ETHZ masked bidirectional real
+  pretrained: wandb_logs/MA/2024-10-19__17_30_09 # Hydra Unet Bert Style ETHZ
 
 #model_update:
 #  dropout: 0.2
@@ -27,15 +24,15 @@ train:
   #only_final_layer: True
   #num_layers: 1
   # l2 norm with regard to pretrained weights
-  #l2: True
-  #l2_lambda: 0.01
+  # l2: True
+  # l2_lambda: 0.001
 
 dataset:
   sample_len: 4096
   bits: 0
   d_data: 3
   dataset_name: ETHZ
-  norm_type: peak
+  norm_type: std
   training_fraction: 0.05
 
 encoder:
@@ -45,27 +42,27 @@ encoder:
 decoder:
   _name_: phase-pick
   convolutional: True
-  kernel_size: 129
+  kernel_size: 33
   #dropout: 0.1
 
 loader:
-  batch_size: 64
+  batch_size: 16
   drop_last: True
   persistent_workers: True
 
 optimizer:
-  lr: 0.001
+  lr: 1e-5
   weight_decay: 0
 
 # the ETHZ train dataset has 22626 traces
 # with batch size 128 and drop last true that is 176 batches per epoch
 
 scheduler:
-  num_warmup_steps: 100
-  num_training_steps: 1000
+  num_warmup_steps: 500
+  num_training_steps: 5000
 
 trainer:
-  max_steps: 1000
+  max_steps: 5000
   max_epochs: 100
   gradient_clip_val: 1.0
   val_check_interval: 0.5 #validate 2 times per epoch

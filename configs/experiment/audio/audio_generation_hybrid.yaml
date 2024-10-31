@@ -18,13 +18,12 @@ model:
   expand: 2
   ff: 0
   pool:
-    - 4
-    - 4
-    - 4
+    - 16
+    - 16
   dropout: 0.0
-  unet: False
+  unet: True
   d_conv: 4
-  complex: True
+  is_complex: False
 
 train:
   monitor: val/loss
@@ -37,7 +36,7 @@ task:
     - mse
 
 dataset:
-  sample_len: 33768
+  sample_len: 33792
   sample_rate: 44100
   auto_reg: True
   return_labels: False
@@ -48,7 +47,7 @@ encoder:
 
 decoder:
   _name_: causal-decoder
-  kernel_size: 256
+  kernel_size: 32
 
 loader:
   batch_size: 16
@@ -57,10 +56,10 @@ loader:
 # audio dataset currently has 3964 train examples
 
 scheduler:
-  num_warmup_steps: 4020
-  num_training_steps: 40200
+  num_warmup_steps: 2010
+  num_training_steps: 20100
 
 trainer:
-  max_steps: 40200
-  max_epochs: 600
+  max_steps: 20100
+  max_epochs: 300
   gradient_clip_val: 1.0

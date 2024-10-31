@@ -3,25 +3,20 @@
 defaults:
   - /trainer: default
   - /loader: default
-  - /dataset: seisbench_auto_reg
-  - /task: regression
+  - /dataset: seisbench_phase
+  - /task: phase_pick
   - /optimizer: adamw_mamba
   - /scheduler: cosine_warmup
-  - /model: mamba_sashimi
+  - /model: bidir_autoreg_mamba
 
-experiment_name: mamba_sash_ethz
+experiment_name: phasepick_ethz_mamba_baar_small
 
 model:
-  d_model: 64
-  n_layers: 9
+  d_model: 32
+  n_layers: 8
   expand: 2
   ff: 0
-  pool:
-    - 4
-    - 4
-  dropout: 0.0
-  unet: True
-  d_conv: 4
+  dropout: 0.1
   is_complex: True
 
 train:
@@ -29,41 +24,32 @@ train:
   mode: min
   #chpt_path: wandb_logs/MA/
 
-task:
-  metrics:
-    - log_mse
-    - mse
-
 dataset:
-  dataset_name: ETHZ
   sample_len: 4096
   bits: 0
   d_data: 3
   norm_type: std
 
-  
 encoder:
-  _name_: linear
+  _name_: bidir-autoreg-encoder
 
 decoder:
-  _name_: linear
+  _name_: bidir-phasepick-decoder
 
 loader:
-  batch_size: 64
+  batch_size: 256
   drop_last: True
 
 # the ETHZ train dataset has 22626 traces
 # with batch size 128 and drop last true that is 176 batches per epoch
 
-# approx 14min per epoch on rtx4090 with batch size 64
-
 scheduler:
-  num_warmup_steps: 3530
-  num_training_steps: 35300
+  num_warmup_steps: 880
+  num_training_steps: 8800
 
 trainer:
-  max_steps: 35300
+  max_steps: 8800
   max_epochs: 100
-  log_every_n_steps: 50
+  log_every_n_steps: 10
   val_check_interval: 0.5
   gradient_clip_val: 1.0

@@ -1,0 +1,7 @@
+# _target_: torch.optim.AdamW
+_name_: adamw
+lr: 8e-4 # Initial learning rate
+weight_decay: 1e-5 # Weight decay
+betas: [0.9, 0.98]
+eps: 1.0e-06
+
