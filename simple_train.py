@@ -12,12 +12,13 @@ import re
 import psutil
 import yaml
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, BaseFinetuning
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary, LayerSummary
 import torch
 import numpy as np
 import pandas as pd
+from torch.optim import Optimizer
 
 from tasks.encoders import instantiate_encoder, load_encoder_from_file, instantiate_encoder_simple
 from tasks.decoders import instantiate_decoder, load_decoder_from_file, instantiate_decoder_simple
@@ -33,12 +34,37 @@ from omegaconf import DictConfig, OmegaConf
 from seisbench.util import worker_seeding
 import seisbench
 import logging
+
 # ignore INFO level logging
 seisbench.logger.setLevel(logging.WARNING)
 
 # fix random seeds
 torch.random.manual_seed(0)
 np.random.seed(0)
+
+
+class ModelFreezeUnfreeze(BaseFinetuning):
+    def __init__(self, unfreeze_at_epoch=0):
+        super().__init__()
+        self._unfreeze_at_epoch = unfreeze_at_epoch
+
+    def freeze_before_training(self, pl_module: "pl.LightningModule") -> None:
+        self.freeze(pl_module.model)
+        self.freeze(pl_module.encoder)
+
+    def finetune_function(self, pl_module, current_epoch, optimizer) -> None:
+        if current_epoch == self._unfreeze_at_epoch:
+            print(f'Unfreezing model at epoch {current_epoch}')
+            self.unfreeze_and_add_param_group(
+                modules=pl_module.model,
+                optimizer=optimizer,
+                train_bn=True
+            )
+            self.unfreeze_and_add_param_group(
+                modules=pl_module.encoder,
+                optimizer=optimizer,
+                train_bn=True
+            )
 
 
 class SimpleSeqModel(pl.LightningModule):
@@ -48,6 +74,7 @@ class SimpleSeqModel(pl.LightningModule):
         self.d_data = d_data
 
         self.l2_norm = config.train.get('l2', False)
+
         if config.model.get('pretrained', None) is not None:
             # load pretrained model
             print('\nLoading pretrained model\n')
@@ -275,7 +302,7 @@ class SimpleSeqModel(pl.LightningModule):
 
 def create_trainer(config):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d__%H_%M_%S")
-    #model_name = config.model['_name_']
+    # model_name = config.model['_name_']
     experiment_name = config.experiment_name
 
     # setup logger
@@ -318,8 +345,16 @@ def create_trainer(config):
         dirpath=f'wandb_logs/MA/{current_date}/checkpoints',
     )
 
+    callbacks = [lr_monitor, top_checkpoints, last_checkpoints]
+
+    unfreeze_at_epoch = config.train.get('unfreeze_at_epoch', 0)
+    if unfreeze_at_epoch > 0:
+        print(f'adding freeze unfreeze callback for epoch {unfreeze_at_epoch}')
+        unfreeze_callback = ModelFreezeUnfreeze(unfreeze_at_epoch=unfreeze_at_epoch)
+        callbacks.append(unfreeze_callback)
+
     # initialize trainer
-    trainer = pl.Trainer(logger=loggers, callbacks=[lr_monitor, top_checkpoints, last_checkpoints], **config.trainer)
+    trainer = pl.Trainer(logger=loggers, callbacks=callbacks, **config.trainer)
     return trainer
 
 
@@ -396,7 +431,7 @@ def load_checkpoint(
         full_config = OmegaConf.create(hparams)
         full_config.model.update(updated_model_config)
         model = SimpleSeqModel(full_config, d_data=d_data)
-        #model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
+        # model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
     else:
         model = SimpleSeqModel(OmegaConf.create(hparams), d_data=d_data)
 
@@ -404,7 +439,7 @@ def load_checkpoint(
     if not rand_init:
         print(f'Loading state dict from checkpoint')
         model.load_state_dict(torch.load(checkpoint_path, map_location=location)['state_dict'])
-        #model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
+        # model = SimpleSeqModel.load_from_checkpoint(checkpoint_path, map_location=location)
     else:
         print(f'Returning randomly initialized model')
 
