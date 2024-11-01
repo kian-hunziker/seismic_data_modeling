@@ -570,10 +570,11 @@ class SanityCheckPhasePicker(nn.Module):
         super().__init__()
         self.upsample = upsample
         self.output_len = output_len
+        hidden_dim = 64
 
-        self.linear1 = nn.Linear(in_features, 4 * out_features)
-        self.linear2 = nn.Linear(4 * out_features, 4 * out_features)
-        self.linear3 = nn.Linear(4 * out_features, out_features)
+        self.linear1 = nn.Linear(in_features, hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        self.linear3 = nn.Linear(hidden_dim, out_features)
 
         self.conv = nn.Conv1d(
             in_channels=out_features,
