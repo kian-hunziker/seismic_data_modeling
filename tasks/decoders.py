@@ -612,16 +612,17 @@ class DoubleConvPhasePickDecoder(nn.Module):
         assert kernel_size % 2 == 1, 'Kernel size must be uneven'
         padding = int(kernel_size // 2)
         self.net = nn.Sequential(
-            nn.Conv1d(in_channels=in_features, out_channels=4 * out_features, kernel_size=kernel_size, stride=1,
+            nn.Conv1d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size, stride=1,
                       padding=padding, bias=False),
-            nn.BatchNorm1d(4 * out_features),
+            nn.BatchNorm1d(in_features),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            nn.Conv1d(in_channels=4 * out_features, out_channels=out_features, kernel_size=kernel_size, stride=1,
+            nn.Conv1d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size, stride=1,
                       padding=padding, bias=False),
-            nn.BatchNorm1d(out_features),
+            nn.BatchNorm1d(in_features),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
         )
+        self.linear = nn.Linear(in_features, out_features)
         self.conv = nn.Conv1d(in_channels=out_features, out_channels=out_features, kernel_size=kernel_size, stride=1,
                               padding=padding, bias=False)
 
@@ -632,9 +633,10 @@ class DoubleConvPhasePickDecoder(nn.Module):
             elif len(x) == 2:
                 x = x[0]
         x = x.transpose(1, 2)
-        x = self.net(x)
         if self.upsample:
             x = F.interpolate(x, 4 * x.shape[-1], mode='linear')
+        x = self.net(x).transpose(1, 2)
+        x = self.linear(x).transpose(1, 2)
         x = self.conv(x).transpose(1, 2)
         len_diff = x.shape[1] - self.output_len
         if len_diff > 0:
