@@ -592,13 +592,15 @@ class SanityCheckPhasePicker(nn.Module):
                 x = x[0]
         seq_len = x.shape[1]
 
+        x = x.transpose(1, 2)
+        if self.upsample:
+            x = F.interpolate(x, size=4 * seq_len, mode='linear').transpose(1, 2)
+
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
-        x = x.transpose(1, 2)
-        if self.upsample:
-            x = F.interpolate(x, size=4 * seq_len, mode='linear')
-        x = self.conv(x).transpose(1, 2)
+
+        x = self.conv(x.transpose(1, 2)).transpose(1, 2)
         len_diff = x.shape[1] - self.output_len
         if len_diff > 0:
             x = x[:, len_diff // 2: - len_diff // 2, :]
