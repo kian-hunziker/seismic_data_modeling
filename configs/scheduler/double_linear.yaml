@@ -5,3 +5,4 @@ scheduler:
   _name_: double_linear
   num_warmup_steps: 320
   num_cooldown_steps: 2880
+  lr_fraction_second_iter: 0.5
