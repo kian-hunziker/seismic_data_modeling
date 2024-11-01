@@ -301,6 +301,10 @@ class SimpleSeqModel(pl.LightningModule):
 
 
 def create_trainer(config):
+    print('\n\n', '*' * 32)
+    print('Initializing trainer')
+    print('*' * 32, '\n')
+
     current_date = datetime.datetime.now().strftime("%Y-%m-%d__%H_%M_%S")
     # model_name = config.model['_name_']
     experiment_name = config.experiment_name
@@ -349,7 +353,7 @@ def create_trainer(config):
 
     unfreeze_at_epoch = config.train.get('unfreeze_at_epoch', 0)
     if unfreeze_at_epoch > 0:
-        print(f'adding freeze unfreeze callback for epoch {unfreeze_at_epoch}')
+        print(f'\nadding freeze unfreeze callback for epoch {unfreeze_at_epoch}\n')
         unfreeze_callback = ModelFreezeUnfreeze(unfreeze_at_epoch=unfreeze_at_epoch)
         callbacks.append(unfreeze_callback)
 
@@ -512,6 +516,22 @@ def main(config: OmegaConf) -> None:
             min_seq_len = config.train.get('min_seq_len', 256)
         else:
             seq_warmup = False
+
+        # ===================================================================================================
+        # SANITY CHECK
+        weights = []
+        for param in model.model.parameters():
+            weights.extend(param.view(-1).tolist())  # Flatten and convert to list
+            if len(weights) > 100:
+                break
+        encoder_weights = []
+        for param in model.encoder.parameters():
+            encoder_weights.extend(param.view(-1).tolist())  # Flatten and convert to list
+            if len(encoder_weights) > 100:
+                break
+        print('\n\n', "First 100 model weights:", weights[:100])
+        print("First 100 encoder weights:", encoder_weights[:100], '\n\n')
+        # ===================================================================================================
 
         summary = ModelSummary(model, max_depth=1)
         print('\n', '*' * 32, '\n')
