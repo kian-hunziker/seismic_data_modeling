@@ -17,6 +17,7 @@ scheduler = {
     "constant_warmup": "transformers.get_constant_schedule_with_warmup",
     "linear_warmup":   "transformers.get_linear_schedule_with_warmup",
     "cosine_warmup":   "transformers.get_cosine_schedule_with_warmup",
+    'double_linear':   "utils.custom_schedulers.DoubleLinearScheduler"
 }
 
 model = {
