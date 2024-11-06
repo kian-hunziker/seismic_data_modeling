@@ -68,10 +68,11 @@ class DownPool(nn.Module):
 
 
 class UpPool(nn.Module):
-    def __init__(self, d_input, expand, pool):
+    def __init__(self, d_input, expand, pool, bidirectional=False):
         super().__init__()
         self.d_output = d_input // expand
         self.pool = pool
+        self.bidirectional = bidirectional
 
         self.linear = LinearActivation(
             d_input,
@@ -82,7 +83,8 @@ class UpPool(nn.Module):
     def forward(self, x, skip=None):
         x = self.linear(x)
 
-        x = F.pad(x[..., :-1], (1, 0))  # Shift to ensure causality
+        if not self.bidirectional:
+            x = F.pad(x[..., :-1], (1, 0))  # Shift to ensure causality
         x = rearrange(x, '... (h s) l -> ... h (l s)', s=self.pool)
 
         if skip is not None:
@@ -396,7 +398,7 @@ class MambaSashimi(nn.Module):
             if simple_up_down:
                 block.append(UpPoolSimple(H * expand, expand, p))
             else:
-                block.append(UpPool(H * expand, expand, p))
+                block.append(UpPool(H * expand, expand, p, bidirectional=bidirectional))
 
             for _ in range(n_layers):
                 block.append(mamba_block(H, layer_idx))
