@@ -39,7 +39,7 @@ import logging
 seisbench.logger.setLevel(logging.WARNING)
 
 # fix random seeds
-torch.random.manual_seed(0)
+torch.manual_seed(0)
 np.random.seed(0)
 
 
@@ -74,6 +74,7 @@ class SimpleSeqModel(pl.LightningModule):
         self.d_data = d_data
 
         self.l2_norm = config.train.get('l2', False)
+        self.random_sample_len = config.train.get('random_sample_len', False)
 
         if config.model.get('pretrained', None) is not None:
             # load pretrained model
@@ -179,6 +180,12 @@ class SimpleSeqModel(pl.LightningModule):
                 x, mask = x
         else:
             x, y = batch
+
+        if self.random_sample_len:
+            sample_len = min(x.shape[1].item(), int(16 * torch.randint(180, 512)))
+            start_idx = torch.randint(0, x.shape[1] - sample_len)
+            x = x[:, start_idx:start_idx + sample_len, :]
+            y = y[:, start_idx:start_idx + sample_len, :]
 
         # encode
         x = self.encoder(x)

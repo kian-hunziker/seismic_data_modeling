@@ -641,9 +641,10 @@ class DoubleConvPhasePickDecoder(nn.Module):
         x = self.net(x).transpose(1, 2)
         x = self.linear(x).transpose(1, 2)
         x = self.conv(x).transpose(1, 2)
-        len_diff = x.shape[1] - self.output_len
-        if len_diff > 0:
-            x = x[:, len_diff // 2: - len_diff // 2, :]
+        if self.output_len > 0:
+            len_diff = x.shape[1] - self.output_len
+            if len_diff > 0:
+                x = x[:, len_diff // 2: - len_diff // 2, :]
         return x
 
 
