@@ -182,7 +182,7 @@ class SimpleSeqModel(pl.LightningModule):
             x, y = batch
 
         if self.random_sample_len:
-            sample_len = min(x.shape[1].item(), int(16 * torch.randint(180, 512)))
+            sample_len = min(x.shape[1], int(16 * torch.randint(180, 512)))
             start_idx = torch.randint(0, x.shape[1] - sample_len)
             x = x[:, start_idx:start_idx + sample_len, :]
             y = y[:, start_idx:start_idx + sample_len, :]
