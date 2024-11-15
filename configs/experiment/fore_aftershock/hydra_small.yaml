@@ -1,0 +1,64 @@
+# @package _global_
+
+defaults:
+  - /trainer: default
+  - /loader: default
+  - /dataset: foreshock_aftershock
+  - /task: classification
+  - /optimizer: adamw_hydra
+  - /scheduler: linear
+  - /model: hydra_unet
+
+experiment_name: hydra_phase_pick_ETHZ
+
+model:
+  d_model: 8
+  n_layers: 5
+  d_state: 64
+  d_conv: 7
+  expand: 2
+  pool:
+    - 4
+    - 4
+  # headdim: 3
+  use_mem_eff_path: True
+  skip_first_res: False
+  dropout: 0.2
+
+train:
+  monitor: val/loss
+  mode: min
+  #seq_warmup: True
+  #final_sample_len: 4096
+  #final_batch_size: 2
+  #min_seq_len: 512
+  #num_epochs_warmup: 1
+  #pretrained_model: wandb_logs/MA/2024-09-27__12_41_07
+
+dataset:
+  num_classes: 2
+  batch_size: 16
+  num_workers: 0
+
+encoder:
+  _name_: linear
+
+decoder:
+  _name_: sequence-classifier
+  mode: avg
+  num_classes: 2
+
+# 318 * 16 training examples
+
+scheduler:
+  num_warmup_steps: 3180
+  num_training_steps: 31800
+
+trainer:
+  max_steps: 31800
+  max_epochs: 100
+  #limit_train_batches: 0.01
+  #limit_val_batches: 0.1
+  log_every_n_steps: 20
+  #val_check_interval: 0.5 #validate 2 times per epoch
+  gradient_clip_val: 1.0

@@ -1,0 +1,16 @@
+_name_: foreshock-aftershock
+
+data_dir: "dataloaders/data"
+num_classes: 2
+batch_size: 16
+event_split_method: 'temporal'
+component_order: 'ZNE'
+seed: 42
+train_frac: 0.7
+val_frac: 0.1
+test_frac: 0.2
+dimension_order: 'NWC'
+demean_axis: 1
+amp_norm_axis: 1
+amp_norm_type: 'std'
+num_workers: 0
