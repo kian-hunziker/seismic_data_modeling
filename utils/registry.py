@@ -44,6 +44,7 @@ dataset = {
     "ethz-auto-reg": "dataloaders.seisbench_auto_reg.SeisBenchAutoReg",
     "ethz-phase-pick": "dataloaders.seisbench_auto_reg.SeisBenchPhasePick",
     "audio-dataset": "dataloaders.audio_loader.AudioDatasetLit",
+    "foreshock-aftershock": "dataloaders.foreshock_aftershock_lit.ForeshockAftershockLitDataset"
 }
 
 preloadable_datasets = [
