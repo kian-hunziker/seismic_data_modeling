@@ -40,8 +40,8 @@ import logging
 seisbench.logger.setLevel(logging.WARNING)
 
 # fix random seeds
-torch.manual_seed(0)
-np.random.seed(0)
+torch.manual_seed(42)
+np.random.seed(42)
 
 
 class ModelFreezeUnfreeze(BaseFinetuning):
