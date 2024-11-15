@@ -24,6 +24,7 @@ from tasks.encoders import instantiate_encoder, load_encoder_from_file, instanti
 from tasks.decoders import instantiate_decoder, load_decoder_from_file, instantiate_decoder_simple
 from tasks.task import task_registry
 from dataloaders.base import SeisbenchDataLit
+from dataloaders.foreshock_aftershock_lit import ForeshockAftershockLitDataset
 
 from torch.utils.data import DataLoader
 
@@ -494,6 +495,10 @@ def main(config: OmegaConf) -> None:
                 worker_init_fn=worker_seeding,
                 **config.loader
             )
+        elif isinstance(dataset, ForeshockAftershockLitDataset):
+            print('\nInitializing Foreshock-Aftershock Loaders\n')
+            train_loader = dataset.train_loader
+            val_loader = dataset.val_loader
         else:
             print('\nInitializing Standard Loaders\n')
             train_loader = DataLoader(
