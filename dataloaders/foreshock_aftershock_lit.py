@@ -37,6 +37,7 @@ class ForeshockAftershockLitDataset(pl.LightningDataModule):
 
         loaders = prepare_foreshock_aftershock_dataloaders(
             data_dir=data_dir,
+            num_classes=num_classes,
             batch_size=batch_size,
             event_split_method=event_split_method,
             component_order=component_order,
