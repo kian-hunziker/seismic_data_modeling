@@ -272,6 +272,9 @@ class SequenceClassifier(nn.Module):
         super(SequenceClassifier, self).__init__()
         self.mode = mode
         self.linear = nn.Linear(in_features, num_classes)
+        if mode == 'avg-mlp':
+            self.lin1 = nn.Linear(in_features, 2*in_features)
+            self.lin2 = nn.Linear(2*in_features, num_classes)
 
     def forward(self, x, state=None):
         if self.mode == 'avg':
@@ -280,6 +283,10 @@ class SequenceClassifier(nn.Module):
         elif self.mode == 'last':
             x = x[:, -1, :]
             x = self.linear(x)
+        elif self.mode == 'avg-mlp':
+            x = torch.mean(x, dim=1)
+            x = F.gelu(self.lin1(x))
+            x = self.lin2(x)
         else:
             print(f'Unknown mode: {self.mode}')
         return x
