@@ -267,14 +267,40 @@ class PhasePickDecoder(nn.Module):
             return self.linear(x)
 
 
+class LargePhasePickDecoder(nn.Module):
+    def __init__(self, d_model, output_dim=3, dropout=0.0, kernel_size_1=129, kernel_size_2=5):
+        super(LargePhasePickDecoder, self).__init__()
+        self.d_model = d_model
+
+        self.net = nn.Sequential(
+            nn.Conv1d(in_channels=d_model, out_channels=d_model, kernel_size=kernel_size_1, stride=1,
+                      padding=kernel_size_1 // 2, bias=False),
+            nn.BatchNorm1d(d_model),
+            nn.GELU(),
+            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
+            nn.Conv1d(in_channels=d_model, out_channels=d_model, kernel_size=kernel_size_2, stride=1,
+                      padding=kernel_size_2 // 2, bias=False),
+            nn.BatchNorm1d(d_model),
+            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
+            nn.Conv1d(in_channels=d_model, out_channels=output_dim, kernel_size=kernel_size_2, stride=1,
+                      padding=kernel_size_2 // 2, bias=False)
+        )
+
+    def forward(self, x, state=None):
+        x = x.transpose(1, 2)
+        x = self.net(x)
+        x = x.transpose(1, 2)
+        return x
+
+
 class SequenceClassifier(nn.Module):
     def __init__(self, in_features, out_features, num_classes, mode='avg'):
         super(SequenceClassifier, self).__init__()
         self.mode = mode
         self.linear = nn.Linear(in_features, num_classes)
         if mode == 'avg-mlp':
-            self.lin1 = nn.Linear(in_features, 2*in_features)
-            self.lin2 = nn.Linear(2*in_features, num_classes)
+            self.lin1 = nn.Linear(in_features, 2 * in_features)
+            self.lin2 = nn.Linear(2 * in_features, num_classes)
 
     def forward(self, x, state=None):
         if self.mode == 'avg':
@@ -674,10 +700,11 @@ dec_registry = {
     'causal-bidir-autoreg-decoder': CausalBidirAutoregDecoder,
     'sanity-check-decoder': SanityCheckPhasePicker,
     'double-conv-phase-pick': DoubleConvPhasePickDecoder,
+    'large-phase-pick-decoder': LargePhasePickDecoder,
 }
 
 pretrain_decoders = ['transformer', 's4-decoder', 'pool', 'embedding']
-phasepick_decoders = ['phase-pick']
+phasepick_decoders = ['phase-pick', 'large-phase-pick-decoder',]
 
 
 def instantiate_decoder(decoder, dataset: SequenceDataset = None, model: nn.Module = None):
