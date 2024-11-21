@@ -281,6 +281,7 @@ class LargePhasePickDecoder(nn.Module):
             nn.Conv1d(in_channels=d_model, out_channels=d_model, kernel_size=kernel_size_2, stride=1,
                       padding=kernel_size_2 // 2, bias=False),
             nn.BatchNorm1d(d_model),
+            nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Conv1d(in_channels=d_model, out_channels=output_dim, kernel_size=kernel_size_2, stride=1,
                       padding=kernel_size_2 // 2, bias=False)
